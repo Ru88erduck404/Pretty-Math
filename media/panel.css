@@ -1,0 +1,327 @@
+:root {
+  --pm-size: 20px;
+  --pm-rule: 0.055em;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--vscode-foreground);
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  font-family: var(--vscode-font-family);
+  font-size: var(--vscode-font-size);
+}
+
+/* ------------------------------------------------------------------ toolbar */
+
+#bar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  background: var(--vscode-panel-background, var(--vscode-editor-background));
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+}
+
+#bar .spacer { flex: 1; }
+
+#where {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#bar button {
+  border: 1px solid transparent;
+  border-radius: 3px;
+  padding: 2px 8px;
+  font-family: inherit;
+  font-size: 11px;
+  color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+  background: var(--vscode-button-secondaryBackground, transparent);
+  cursor: pointer;
+}
+#bar button:hover { background: var(--vscode-button-secondaryHoverBackground, var(--vscode-toolbar-hoverBackground)); }
+#bar button.on {
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+}
+
+/* ------------------------------------------------------------------- layout */
+
+#content { padding: 10px 14px 24px; }
+
+.hint {
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+  margin: 6px 2px;
+}
+
+.row { padding: 10px 2px 12px; }
+.row + .row { border-top: 1px solid var(--vscode-panel-border, rgba(128,128,128,.25)); }
+
+.math {
+  /* Windows ships Cambria Math, macOS STIX Two Math / STIXGeneral, Linux
+     usually one of the TeX faces. Apple Symbols is last of the math-capable
+     names because it still carries the radical and large delimiters that the
+     plain text serifs after it do not. */
+  font-family: "Cambria Math", "STIX Two Math", "STIXGeneral", "Latin Modern Math",
+               "XITS Math", "TeX Gyre Termes Math", "Asana Math", "DejaVu Math TeX Gyre",
+               "Apple Symbols", Georgia, "Times New Roman", serif;
+  font-size: var(--pm-size);
+  line-height: 2.1;
+  color: var(--vscode-editor-foreground);
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+  white-space: nowrap;
+}
+
+.source {
+  margin-top: 8px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.extra {
+  margin-top: 8px;
+  padding: 6px 8px;
+  border-radius: 3px;
+  background: var(--vscode-textCodeBlock-background, rgba(128,128,128,.1));
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--vscode-foreground);
+}
+
+.error {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: pre;
+  overflow-x: auto;
+  color: var(--vscode-errorForeground);
+}
+.error .msg { display: block; margin-bottom: 6px; }
+.error .snip { color: var(--vscode-foreground); }
+
+/* -------------------------------------------------------------------- atoms */
+
+.pm-n { position: relative; }
+
+.pm-var { font-style: italic; }
+.pm-greek { font-style: italic; }
+.pm-name { font-style: normal; }
+.pm-num-lit { font-style: normal; color: var(--vscode-charts-blue, #4fa3ff); }
+.pm-const { font-style: normal; color: var(--vscode-charts-orange, #d18616); }
+.pm-fn { font-style: normal; color: var(--vscode-charts-purple, #b180d7); padding-right: .02em; }
+.pm-string { font-style: normal; color: var(--vscode-charts-orange, #d18616); font-size: .8em; }
+.pm-punct { color: var(--vscode-descriptionForeground); padding: 0 .06em; }
+.pm-word { font-style: normal; font-size: .8em; color: var(--vscode-descriptionForeground); }
+
+.pm-op { padding: 0 .22em; }
+.pm-op-rel { padding: 0 .3em; color: var(--vscode-charts-red, #f14c4c); }
+.pm-op-logic { padding: 0 .28em; color: var(--vscode-charts-green, #89d185); }
+.pm-op-bitwise { padding: 0 .28em; color: var(--vscode-charts-yellow, #cca700); font-style: normal; }
+.pm-op-word { padding: 0 .35em; font-style: normal; font-size: .82em; color: var(--vscode-descriptionForeground); }
+.pm-prefix { padding: 0 .02em 0 0; }
+
+.pm-thin { display: inline-block; width: .2em; }
+.pm-gap { display: inline-block; width: .32em; }
+
+/* ------------------------------------------------------------- superscripts */
+
+.pm-power { white-space: nowrap; }
+.pm-sup {
+  font-size: .68em;
+  vertical-align: .55em;
+  line-height: 0;
+  padding-left: .04em;
+}
+.pm-sub {
+  font-size: .68em;
+  vertical-align: -.28em;
+  line-height: 0;
+  padding-left: .03em;
+}
+.pm-sup .pm-sup, .pm-sub .pm-sub { font-size: .8em; }
+
+/* ---------------------------------------------------------------- fractions */
+
+.pm-frac {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  margin: 0 .2em;
+  text-align: center;
+  line-height: 1.25;
+}
+.pm-frac-num { padding: 0 .4em .08em; }
+.pm-frac-den {
+  padding: .1em .4em 0;
+  border-top: var(--pm-rule) solid currentColor;
+  width: 100%;
+}
+.pm-frac .pm-frac { font-size: .95em; }
+
+/* -------------------------------------------------------------------- roots */
+
+.pm-sqrt {
+  display: inline-flex;
+  align-items: flex-end;
+  vertical-align: middle;
+  margin: 0 .1em;
+  line-height: 1.2;
+}
+.pm-radical {
+  display: inline-block;
+  line-height: 1;
+  transform-origin: center bottom;
+  padding-right: .02em;
+}
+.pm-radicand {
+  border-top: var(--pm-rule) solid currentColor;
+  padding: .14em .3em .04em .1em;
+}
+.pm-root-index {
+  font-size: .55em;
+  align-self: flex-start;
+  margin-right: -.5em;
+  position: relative;
+  top: .2em;
+}
+
+/* ------------------------------------------------------------------- fences */
+
+.pm-fenced { white-space: nowrap; }
+.pm-fence { color: var(--vscode-descriptionForeground); }
+
+.pm-fenced-tall {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.pm-fenced-tall > .pm-fence {
+  display: inline-block;
+  line-height: 1;
+  transform-origin: center center;
+}
+.pm-fenced-tall > .pm-body { padding: 0 .08em; }
+
+/* -------------------------------------------------------------- other boxes */
+
+.pm-stack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+  padding: 0 .2em;
+}
+
+.pm-bigop-glyph { font-size: 1.35em; line-height: 1; vertical-align: -.1em; }
+
+/* ----------------------------------------------------------------- calculus */
+
+/* The upright d of dx and of a derivative, never italic. */
+.pm-dd { font-style: normal; padding-right: .04em; }
+
+.pm-integral {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.pm-int {
+  display: inline-flex;
+  align-items: stretch;
+  padding-right: .1em;
+}
+.pm-int-glyph {
+  display: inline-block;
+  font-size: 1.5em;
+  line-height: 1;
+  transform-origin: center center;
+  align-self: center;
+}
+.pm-int-body { padding-left: .1em; }
+
+/* Limits beside an integral sign: upper at its top, lower at its foot. */
+.pm-limits {
+  display: inline-flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: .52em;
+  line-height: 1.1;
+  padding: .1em 0 .1em .1em;
+}
+
+/* Limits above and below a sigma or pi. */
+.pm-bigstack {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.1;
+  padding: 0 .1em;
+}
+.pm-bigstack > .pm-bigop-glyph { font-size: 1.55em; }
+.pm-lim-over, .pm-lim-under { font-size: .52em; line-height: 1.2; white-space: nowrap; }
+.pm-lim-over:empty, .pm-lim-under:empty { display: none; }
+
+.pm-limop {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  vertical-align: middle;
+  line-height: 1.1;
+  padding-right: .1em;
+}
+
+.pm-cases {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.pm-cases > .pm-brace {
+  display: inline-block;
+  line-height: 1;
+  transform-origin: center center;
+  padding-right: .18em;
+  color: var(--vscode-descriptionForeground);
+}
+.pm-cases-grid {
+  display: inline-grid;
+  grid-template-columns: auto auto;
+  column-gap: 1em;
+  row-gap: .15em;
+  align-items: center;
+  line-height: 1.4;
+}
+.pm-case-val { text-align: left; }
+.pm-case-cond { font-size: .78em; color: var(--vscode-descriptionForeground); }
+
+/* --------------------------------------------------------------- highlights */
+
+.pm-hot {
+  background: var(--vscode-editor-selectionHighlightBackground, rgba(100,150,255,.25));
+  border-radius: 3px;
+  box-shadow: 0 0 0 2px var(--vscode-editor-selectionHighlightBackground, rgba(100,150,255,.25));
+}
+
+.pm-cursor {
+  box-shadow: 0 0 0 1px var(--vscode-editorBracketMatch-border, rgba(128,128,128,.6));
+  border-radius: 3px;
+}
+
+.math:hover .pm-n { cursor: pointer; }

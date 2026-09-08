@@ -1,0 +1,35 @@
+# Changelog
+
+All notable changes to Pretty Math are recorded here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
+[semantic versioning](https://semver.org/).
+
+## [0.1.0] — 2026-09-08
+
+First release.
+
+### Added
+
+- A panel view that draws the expression under the cursor as two-dimensional
+  math: stacked fractions, raised exponents, stretched radicals and fences, and
+  ternaries as a two-row piecewise brace.
+- Statement detection around the cursor, joining lines that wrap and stripping
+  comments, `return`, `if (...)`, and C-style type declarations.
+- Per-language reading of operators, so `^` is bitwise XOR in C, Python and
+  JavaScript but a power in MATLAB, Julia and R, and `//` is floor division only
+  where the language says so.
+- Grouping drawn wherever precedence is easy to misread — `a and b or c`,
+  `a + b << c`, `a ^ b | c & d` — even though the language does not need the
+  parentheses.
+- Hover a sub-expression to highlight its source range, click to select it; the
+  sub-expression containing the cursor is outlined.
+- Calculus notation for SymPy and its numerical counterparts: `diff` as a
+  derivative fraction or a `d/dx` operator, `∂` for mixed partials, `integrate`
+  with limits on the sign, `Sum`/`Product` with limits above and below, `limit`,
+  and `Eq`/`Ne`/`Lt`/`Le`/`Gt`/`Ge` as relations. `numpy.diff` is drawn as a
+  discrete difference `Δa`, which is what it computes.
+- Identity expansion for `hypot`, `log1p`, `expm1`, `exp` and fractional powers.
+- Greek names, subscripts, index-as-subscript, and namespace stripping so
+  `np.sqrt(x)` and `self.mass` read as plain math.
+- Copy the current expression as LaTeX, pin the panel, and adjust the size.
+- Parse failures reported with a caret under the offending character.

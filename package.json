@@ -1,0 +1,118 @@
+{
+  "name": "pretty-math",
+  "displayName": "Pretty Math",
+  "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
+  "version": "0.1.0",
+  "publisher": "ru88erduck404",
+  "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
+  "license": "MIT",
+  "engines": { "vscode": "^1.75.0" },
+  "categories": ["Visualization", "Programming Languages", "Education"],
+  "keywords": ["math", "formula", "latex", "equation", "expression", "pretty print"],
+  "main": "./extension.js",
+  "activationEvents": ["onView:prettyMath.view"],
+  "//extensionKind": "Only the editor API is used, never the filesystem, so this can run in the local UI host of a Remote-SSH / WSL / container window instead of being installed on the remote.",
+  "extensionKind": ["ui", "workspace"],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [
+        { "id": "prettyMathPanel", "title": "Pretty Math", "icon": "media/icon.svg" }
+      ]
+    },
+    "views": {
+      "prettyMathPanel": [
+        { "type": "webview", "id": "prettyMath.view", "name": "Pretty Math", "contextualTitle": "Pretty Math" }
+      ]
+    },
+    "commands": [
+      { "command": "prettyMath.show", "title": "Show Panel", "category": "Pretty Math" },
+      { "command": "prettyMath.pin", "title": "Pin / Unpin Current Expression", "category": "Pretty Math" },
+      { "command": "prettyMath.copyLatex", "title": "Copy Current Expression as LaTeX", "category": "Pretty Math" }
+    ],
+    "keybindings": [
+      { "command": "prettyMath.show", "key": "ctrl+alt+m", "mac": "cmd+alt+m" }
+    ],
+    "menus": {
+      "editor/context": [
+        { "command": "prettyMath.show", "group": "navigation@99", "when": "editorTextFocus" }
+      ]
+    },
+    "configuration": {
+      "title": "Pretty Math",
+      "properties": {
+        "prettyMath.autoUpdate": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-render automatically as the cursor moves or the selection changes."
+        },
+        "prettyMath.fontSize": {
+          "type": "number",
+          "default": 20,
+          "minimum": 8,
+          "maximum": 72,
+          "description": "Base font size (px) of the rendered math."
+        },
+        "prettyMath.caretMeansPower": {
+          "type": "string",
+          "enum": ["auto", "always", "never"],
+          "default": "auto",
+          "markdownDescription": "How to read `^`. `auto` uses the language: power in MATLAB/Julia/R/Lua/Fortran, bitwise XOR in C/C++/C#/Java/JavaScript/Python/Rust/Go."
+        },
+        "prettyMath.multiplication": {
+          "type": "string",
+          "enum": ["implicit", "dot", "cross"],
+          "default": "implicit",
+          "markdownDescription": "How to draw `*`. `implicit` juxtaposes factors (a dot is still inserted where it would be ambiguous)."
+        },
+        "prettyMath.indexAsSubscript": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Render `a[i]` as a subscript rather than with brackets."
+        },
+        "prettyMath.greekLetters": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Render identifiers named after Greek letters (`theta`, `omega`, `dt_alpha`, ...) as the letter itself."
+        },
+        "prettyMath.expandIdentities": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Expand a few library calls into the math they stand for: `hypot(a,b)` as a root, `log1p(x)` as ln(1+x), `expm1(x)` as e^x-1, `exp(x)` as e^x."
+        },
+        "prettyMath.derivativeSymbol": {
+          "type": "string",
+          "enum": ["auto", "d", "partial"],
+          "default": "auto",
+          "markdownDescription": "The symbol used for a derivative. `auto` writes `d` for a single variable and `∂` when several are differentiated."
+        },
+        "prettyMath.stripNamespaces": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["Math", "math", "np", "numpy", "cmath", "scipy", "torch", "jnp", "sp", "sym", "sympy", "smp", "self", "this"],
+          "markdownDescription": "Qualifiers dropped before rendering, so `np.sqrt(x)` reads as a plain root and `self.mass` as `mass`."
+        },
+        "prettyMath.showLatex": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the LaTeX source underneath the rendered math."
+        },
+        "prettyMath.showTree": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the parse tree underneath the rendered math."
+        },
+        "prettyMath.maxLines": {
+          "type": "number",
+          "default": 40,
+          "description": "Maximum number of statements rendered from a multi-line selection."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "test": "node test/run.js",
+    "package": "npx --yes @vscode/vsce package"
+  },
+  "repository": { "type": "git", "url": "https://github.com/Ru88erduck404/pretty-math" },
+  "bugs": { "url": "https://github.com/Ru88erduck404/pretty-math/issues" }
+}

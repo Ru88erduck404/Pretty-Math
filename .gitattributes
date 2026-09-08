@@ -1,0 +1,5 @@
+# Keep line endings LF in the repository so the same checkout behaves
+# identically on Windows, macOS and Linux.
+* text=auto eol=lf
+*.png binary
+*.vsix binary
