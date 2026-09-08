@@ -17,6 +17,12 @@ w_i  =  w_i  −  ──────────
 The point is not decoration. `a / b * c` draws only `b` under the bar, so the
 classic precedence slip is visible instead of inferred.
 
+<!-- Capture these two from a running editor; see docs/README.md for how.
+     Delete this comment once the files exist. -->
+![The quadratic formula rendered in the panel](docs/panel.png)
+
+![The same line with and without brackets](docs/precedence.png)
+
 ## Using it
 
 - Open the panel: **Ctrl+Alt+M** (`Cmd+Alt+M` on macOS), or *Pretty Math: Show
@@ -52,6 +58,10 @@ where most of the value is:
 | `theta_max`, `x1`, `v_0` | θ_max, x₁, v₀ | Greek names and subscripts |
 | `np.sqrt`, `self.mass` | √…, mass | configured qualifiers dropped |
 | `a[i]`, `A[i][j]` | a_i, A_i,j | |
+| `sum(x**2 for x in xs)` | Σ with x ∈ xs underneath | also `prod`, `max`, `min`, `all` (∀), `any` (∃) |
+| `[x*2 for x in pts]` | [2x ∣ x ∈ pts] | set-builder form |
+| `lambda x: x**2`, `(x) => x*2` | x ↦ x² | |
+| `(double) sum / count`, `a as f64` | the cast kept as a quiet annotation | |
 
 Tested against Python, JavaScript/TypeScript, C/C++/C#, Java, Rust, Go, MATLAB,
 Octave, Julia and R conventions. Anything it cannot parse is reported with a

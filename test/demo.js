@@ -64,7 +64,16 @@ const SAMPLES = [
   ['python', 'inside = 0 <= i < n'],
   ['c', 'inside = 0 <= i < n;'],
   ['cpp', 'double d = std::sqrt(dx*dx + dy*dy);'],
-  ['python', 'længde = np.sqrt(bredde**2 + højde**2)']
+  ['python', 'længde = np.sqrt(bredde**2 + højde**2)'],
+
+  ['python', 'total = sum(w[i] * x[i] for i in range(n))'],
+  ['python', 'mse = sum((y[i] - p[i])**2 for i in idx if mask[i]) / len(idx)'],
+  ['python', 'ok = all(abs(r) < tol for r in residuals)'],
+  ['python', 'squares = [x**2 for x in points]'],
+  ['python', 'g = lambda x: 1 / (1 + math.exp(-x))'],
+  ['java', 'double avg = (double) sum / count;'],
+  ['rust', 'let ratio = (hits as f64) / (total as f64);'],
+  ['javascript', 'const scale = (x) => x * 2 / (1 + x);']
 ];
 
 const FROM = Number(process.argv[2] || 0);

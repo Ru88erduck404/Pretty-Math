@@ -202,6 +202,20 @@ function toLatex(node, opts) {
       operand(positional[0], MUL, 'right', '*'), MUL);
   }
 
+  function bindingsTex(n) {
+    return n.clauses.map(function (c) {
+      const targets = c.targets.map(function (t) { return go(t).tex; }).join(', ');
+      let out = targets + ' \\in ' + go(c.iter).tex;
+      c.conds.forEach(function (cond) { out += ',\\ ' + go(cond).tex; });
+      return out;
+    }).join(',\\ ');
+  }
+
+  const COMPREHENSION_OPS = {
+    sum: '\\sum', prod: '\\prod', product: '\\prod',
+    all: '\\forall', any: '\\exists', max: '\\max', min: '\\min'
+  };
+
   function callTex(n) {
     const dotted = dottedName(n.callee);
     const name = resolveName(n.callee);
@@ -214,6 +228,13 @@ function toLatex(node, opts) {
     const qualifier = dotted && dotted.indexOf('.') > 0 ? dotted.split('.')[0] : null;
     const owner = (n.callee.type === 'Member' && name !== null && name.indexOf('.') >= 0)
       ? n.callee.obj : null;
+
+    if (last && positional.length === 1 && positional[0].type === 'Comprehension' &&
+        COMPREHENSION_OPS[last]) {
+      const comp = positional[0];
+      return res(COMPREHENSION_OPS[last] + '_{' + bindingsTex(comp) + '} ' +
+        operand(comp.body, MUL, 'right', '*'), MUL);
+    }
 
     if (spec) {
       let built = null;
@@ -357,6 +378,16 @@ function toLatex(node, opts) {
         if (sliced) return res(go(n.obj).tex + '\\left[' + inner + '\\right]');
         return res(go(n.obj).tex + '_{' + inner + '}');
       }
+      case 'Comprehension':
+        return res(go(n.body).tex + ' \\mid ' + bindingsTex(n), 20);
+      case 'Lambda':
+        return res(n.params.map(function (p) { return go(p).tex; }).join(', ') +
+          ' \\mapsto ' + go(n.body).tex, 2);
+      case 'Cast':
+        return res(n.suffix
+          ? operand(n.arg, UNARY, 'right', 'u-') + '\\ \\mathrm{as\\ ' + n.name.replace(/_/g, '\\_') + '}'
+          : '(\\mathrm{' + n.name.replace(/_/g, '\\_').replace(/ /g, '\\ ') + '})\\,' +
+            operand(n.arg, UNARY, 'right', 'u-'), UNARY);
       case 'Spread':
         return res('{' + n.op.replace(/\*/g, '\\ast ') + '}' + go(n.arg).tex);
       case 'Slice':

@@ -4,6 +4,25 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.2] — 2026-09-08
+
+### Added
+
+- Comprehensions. `sum(x**2 for x in values)` is drawn as a Σ with `x ∈ values`
+  underneath, and the same for `prod`, `max`, `min`, `all` (∀) and `any` (∃).
+  A bare comprehension is drawn in set-builder form, `[x² ∣ x ∈ points]`.
+- Lambdas and arrow functions: `lambda x: x**2` and `(x) => x * 2` both become
+  `x ↦ …`.
+- Casts. `(double) sum / count` and Rust's `a as f64` parse, with the type kept
+  as a quiet annotation rather than dropped — the cast is usually the point.
+- Identifiers may use any Unicode letter, so `længde` or `Ströme` work.
+- C++ and Rust scope resolution: `std::sqrt(x)` is drawn as a root.
+- `*args` and `**kwargs` in call arguments.
+
+### Fixed
+
+- Over-deep nesting is reported in words instead of as a stack-overflow message.
+
 ## [0.1.1] — 2026-09-08
 
 ### Fixed

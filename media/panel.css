@@ -325,3 +325,16 @@ body {
 }
 
 .math:hover .pm-n { cursor: pointer; }
+
+/* A cast keeps the type visible, but quietly. */
+.pm-cast {
+  font-style: normal;
+  font-size: .62em;
+  color: var(--vscode-descriptionForeground);
+  padding: 0 .18em 0 0;
+  vertical-align: .12em;
+}
+.pm-cast-suffix {
+  padding: 0 0 0 .3em;
+  vertical-align: 0;
+}

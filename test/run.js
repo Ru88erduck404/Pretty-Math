@@ -81,6 +81,42 @@ check('index subscript', tex('a[i] * b[i + 1]'), 'a_{i} \\cdot b_{i + 1}');
 check('ternary cases', tex('x if x > 0 else -x'), /begin\{cases\}/);
 check('scientific notation', tex('1.5e-3 * x'), '1.5 \\times 10^{-3} \\cdot x');
 
+// ---- comprehensions, lambdas and casts ------------------------------------
+check('sum over a comprehension', tex('total = sum(x**2 for x in values)'),
+  '\\mathrm{total} = \\sum_{x \\in \\mathrm{values}} x^{2}');
+check('comprehension with a filter', tex('t = sum(w[i] for i in idx if w[i] > 0)'),
+  't = \\sum_{i \\in \\mathrm{idx},\\ w_{i} > 0} w_{i}');
+check('all becomes for-all', tex('ok = all(x > 0 for x in row)'),
+  '\\mathrm{ok} = \\forall_{x \\in \\mathrm{row}} \\left(x > 0\\right)');
+check('any becomes there-exists', tex('bad = any(v != v for v in data)'),
+  '\\mathrm{bad} = \\exists_{v \\in \\mathrm{data}} \\left(v \\neq v\\right)');
+check('max over a comprehension', tex('m = max(abs(e) for e in errors)'),
+  'm = \\max_{e \\in \\mathrm{errors}} \\left|e\\right|');
+check('two loop variables', tex('s = sum(a*b for a, b in pairs)'),
+  's = \\sum_{a, b \\in \\mathrm{pairs}} a \\cdot b');
+check('list comprehension keeps its brackets', tex('c = [x * 2 for x in points]'),
+  'c = \\left[x \\cdot 2 \\mid x \\in \\mathrm{points}\\right]');
+check('nested loops', tex('s = sum(i*j for i in a for j in b)'),
+  's = \\sum_{i \\in a,\\ j \\in b} i \\cdot j');
+
+check('python lambda', tex('g = lambda x: x**2 + 1'), 'g = x \\mapsto x^{2} + 1');
+check('lambda with two parameters', tex('h = lambda a, b: a / b'),
+  'h = a, b \\mapsto \\frac{a}{b}');
+check('javascript arrow', tex('f = (x) => x * 2', 'javascript'),
+  'f = x \\mapsto x \\cdot 2');
+check('arrow survives the const declaration', one('const f = (x) => x * 2;', 'javascript').source,
+  'f = (x) => x * 2');
+check('bare arrow parameter', tex('f = x => x + 1', 'javascript'), 'f = x \\mapsto x + 1');
+
+check('C cast', tex('avg = (double) sum / count', 'java'),
+  '\\mathrm{avg} = \\frac{(\\mathrm{double})\\,\\mathrm{sum}}{\\mathrm{count}}');
+check('two-word cast', tex('x = (unsigned int) n * 2', 'c'),
+  'x = (\\mathrm{unsigned\\ int})\\,n \\cdot 2');
+check('rust as-cast', tex('x = (a as f64) / (b as f64)', 'rust'),
+  'x = \\frac{a\\ \\mathrm{as\\ f64}}{b\\ \\mathrm{as\\ f64}}');
+check('a call is not a cast', tex('y = (f) (x) + 1', 'c'),
+  'y = \\operatorname{f}\\left(x\\right) + 1');
+
 // ---- identifiers and scope resolution -------------------------------------
 check('unicode identifiers', tex('længde = bredde * højde'),
   '\\mathrm{længde} = \\mathrm{bredde} \\cdot \\mathrm{højde}');

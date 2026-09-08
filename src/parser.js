@@ -45,6 +45,17 @@ const PREFIX_PREC = 24;
 const NOT_PREC = 8;
 const ASSIGN_OPS = new Set(['=', '+=', '-=', '*=', '/=', '%=', '**=', '//=', ':=', '<<=', '>>=', '&=', '|=', '^=']);
 
+// Words that can only be a type in a C-style cast, never a variable.
+const TYPE_WORDS = new Set([
+  'void', 'bool', 'char', 'short', 'int', 'long', 'float', 'double',
+  'signed', 'unsigned', 'byte', 'size_t', 'ssize_t', 'ptrdiff_t',
+  'Integer', 'Long', 'Short', 'Byte', 'Float', 'Double', 'Number'
+]);
+
+function isTypeWord(word) {
+  return TYPE_WORDS.has(word) || /^u?int(_fast|_least)?(8|16|32|64|max|ptr)?_t$/.test(word);
+}
+
 class Parser {
   constructor(src, flavor) {
     this.src = src;
@@ -115,6 +126,25 @@ class Parser {
           other = this.parseExpr(2);
         }
         left = this.node('Ternary', { cond: cond, then: left, other: other }, left.s, (other || cond).e);
+        continue;
+      }
+
+      // JavaScript's arrow function: the parameters were already parsed as a
+      // name or a parenthesised list.
+      if (this.atOp('=>') && this.f.arrowFunctions && minBp <= 2) {
+        this.next();
+        const body = this.parseExpr(2);
+        const params = left.type === 'List' ? left.items : [left];
+        left = this.node('Lambda', { params: params, body: body }, left.s, body.e);
+        continue;
+      }
+
+      // Rust and friends: `a as f64`
+      if (this.f.asCasts && this.peek().t === 'ident' && this.peek().v === 'as' &&
+          this.peek(1).t === 'ident' && minBp <= 23) {
+        this.next();
+        const type = this.next();
+        left = this.node('Cast', { name: type.v, arg: left, suffix: true }, left.s, type.e);
         continue;
       }
 
@@ -191,11 +221,51 @@ class Parser {
     }
   }
 
+  // `x**2 for x in values if x > 0`, once the leading expression is parsed.
+  atFor() {
+    return this.f.wordLogic && this.peek().t === 'ident' && this.peek().v === 'for';
+  }
+
+  parseComprehension(body) {
+    const clauses = [];
+    let end = body.e;
+    while (this.atFor()) {
+      this.next();
+      const targets = [];
+      for (;;) {
+        targets.push(this.parsePostfix(this.parsePrimary()));
+        if (this.eat(',')) continue;
+        break;
+      }
+      if (!(this.peek().t === 'ident' && this.peek().v === 'in')) {
+        throw new ParseError('Expected "in" after the loop variable', this.peek().s);
+      }
+      this.next();
+      // Binding power 3 keeps `if` out of this: a comprehension filter is not
+      // the conditional expression `a if c else b`.
+      const iter = this.parseExpr(3);
+      end = iter.e;
+      const conds = [];
+      while (this.peek().t === 'ident' && this.peek().v === 'if') {
+        this.next();
+        const cond = this.parseExpr(3);
+        conds.push(cond);
+        end = cond.e;
+      }
+      clauses.push({ targets: targets, iter: iter, conds: conds });
+    }
+    return this.node('Comprehension', { body: body, clauses: clauses }, body.s, end);
+  }
+
   parseArgs(closer, allowSlice) {
     const args = [];
     if (this.atOp(closer)) return args;
     for (;;) {
       args.push(this.parseArgItem(allowSlice));
+      if (args.length === 1 && this.atFor()) {
+        args[0] = this.parseComprehension(args[0]);
+        break;
+      }
       if (this.eat(',')) {
         if (this.atOp(closer)) break; // trailing comma
         continue;
@@ -239,6 +309,28 @@ class Parser {
     return this.node('Slice', { parts: parts }, s, end);
   }
 
+  // A parenthesised type, as in `(double) total` — only where the language has
+  // C-style casts, and only for words that cannot be variable names.
+  castTypeAhead() {
+    if (!this.f.cCasts || !this.atOp('(')) return 0;
+    let k = 1;
+    let words = 0;
+    for (;;) {
+      const t = this.peek(k);
+      if (t.t === 'ident' && isTypeWord(t.v)) { words++; k++; continue; }
+      if (t.t === 'op' && (t.v === '*' || t.v === '&') && words > 0) { k++; continue; }
+      break;
+    }
+    if (!words) return 0;
+    const close = this.peek(k);
+    if (!(close.t === 'op' && close.v === ')')) return 0;
+    // Something must follow that a cast can apply to.
+    const after = this.peek(k + 1);
+    const applies = after.t === 'ident' || after.t === 'num' ||
+      (after.t === 'op' && ('(-+!~'.indexOf(after.v) >= 0));
+    return applies ? k + 1 : 0;
+  }
+
   parsePrimary() {
     const t = this.peek();
 
@@ -246,8 +338,35 @@ class Parser {
     if (t.t === 'str') { this.next(); return this.node('Str', { v: t.v }, t.s, t.e); }
 
     if (t.t === 'ident') {
+      // Python's lambda: `lambda x, y: x * y`
+      if (t.v === 'lambda' && this.f.wordLogic) {
+        this.next();
+        const params = [];
+        while (this.peek().t === 'ident') {
+          const p = this.next();
+          params.push(this.node('Ident', { name: p.v }, p.s, p.e));
+          if (!this.eat(',')) break;
+        }
+        this.expect(':');
+        const body = this.parseExpr(2);
+        return this.node('Lambda', { params: params, body: body }, t.s, body.e);
+      }
       this.next();
       return this.node('Ident', { name: t.v }, t.s, t.e);
+    }
+
+    if (t.t === 'op' && t.v === '(') {
+      const skip = this.castTypeAhead();
+      if (skip) {
+        const words = [];
+        for (let k = 1; k < skip - 1; k++) {
+          const tok = this.peek(k);
+          if (tok.t === 'ident' || tok.v === '*' || tok.v === '&') words.push(tok.v);
+        }
+        for (let k = 0; k < skip; k++) this.next();
+        const arg = this.parseUnary();
+        return this.node('Cast', { name: words.join(' '), arg: arg, suffix: false }, t.s, arg.e);
+      }
     }
 
     if (t.t === 'op' && (t.v === '(' || t.v === '[' || t.v === '{')) {

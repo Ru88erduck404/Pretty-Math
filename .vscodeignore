@@ -5,3 +5,5 @@ test/**
 .gitattributes
 .gitignore
 *.vsix
+docs/*.py
+docs/README.md

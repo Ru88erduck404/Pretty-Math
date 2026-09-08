@@ -34,6 +34,15 @@ const BITWISE_BINDS_TIGHTER = new Set([
 // draw it as a chain.
 const CHAINS_COMPARISONS = new Set(['python', 'cython', 'julia', 'coffeescript', 'plaintext']);
 
+// `(double) total / count` is a cast in the C family; in Python the same shape
+// is a call, so the two must not be confused.
+const C_CASTS = new Set([
+  'c', 'cpp', 'csharp', 'java', 'objective-c', 'objective-cpp', 'cuda-cpp'
+]);
+const ARROW_FUNCTIONS = new Set([
+  'javascript', 'typescript', 'javascriptreact', 'typescriptreact', 'svelte', 'vue'
+]);
+
 function flavorFor(languageId, config) {
   const id = String(languageId || 'plaintext');
   const caretCfg = (config && config.caretMeansPower) || 'auto';
@@ -56,6 +65,9 @@ function flavorFor(languageId, config) {
     wordLogic: WORD_LOGIC.has(id),
     bitwiseBindsTighter: BITWISE_BINDS_TIGHTER.has(id),
     chainsComparisons: CHAINS_COMPARISONS.has(id),
+    cCasts: C_CASTS.has(id),
+    asCasts: id === 'rust' || id === 'csharp' || id === 'kotlin' || id === 'swift',
+    arrowFunctions: ARROW_FUNCTIONS.has(id),
     matrixOps: MATRIX_OPS.has(id),
     // In MATLAB/Octave a trailing quote is transpose, not a string.
     transposeQuote: MATRIX_OPS.has(id) && id !== 'julia',

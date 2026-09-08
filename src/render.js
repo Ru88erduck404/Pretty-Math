@@ -377,6 +377,39 @@ function makeRenderer(opts) {
       '<span class="pm-thin"></span>' + body.html, node, MUL, true);
   }
 
+  // "x ∈ values, x > 0" — the bindings under a Σ, or after the bar in a
+  // set-builder.
+  function bindingsHtml(node) {
+    return node.clauses.map(function (c) {
+      const targets = c.targets.map(function (t) { return render(t).html; })
+        .join('<span class="pm-punct">,</span>');
+      let out = targets + '<span class="pm-op pm-op-rel">∈</span>' + render(c.iter).html;
+      c.conds.forEach(function (cond) {
+        out += '<span class="pm-punct">,</span><span class="pm-gap"></span>' + render(cond).html;
+      });
+      return out;
+    }).join('<span class="pm-punct">,</span><span class="pm-gap"></span>');
+  }
+
+  // sum(x**2 for x in values) is a Σ with the binding underneath.
+  const COMPREHENSION_OPS = {
+    sum: '∑', prod: '∏', product: '∏', all: '∀', any: '∃', max: 'max', min: 'min'
+  };
+
+  function renderOverComprehension(node, name, comp) {
+    const glyph = COMPREHENSION_OPS[name];
+    if (!glyph) return null;
+    const wordy = glyph === 'max' || glyph === 'min';
+    const body = operand(comp.body, MUL, 'right', '*');
+    return box('pm-expr',
+      '<span class="pm-bigstack">' +
+      '<span class="pm-lim-over"></span>' +
+      (wordy ? '<span class="pm-fn">' + glyph + '</span>'
+             : '<span class="pm-bigop-glyph">' + glyph + '</span>') +
+      '<span class="pm-lim-under">' + bindingsHtml(comp) + '</span></span>' +
+      '<span class="pm-thin"></span>' + body.html, node, MUL, true);
+  }
+
   function renderRelation(node, spec, positional) {
     if (positional.length !== 2) return null;
     const l = operand(positional[0], 10, 'left', '==');
@@ -398,6 +431,12 @@ function makeRenderer(opts) {
     // expr.diff(x) / y.integrate(x): the receiver is the expression itself.
     const owner = (node.callee.type === 'Member' && name !== null && name.indexOf('.') >= 0)
       ? node.callee.obj : null;
+
+    // sum / prod / all / any / max / min over a comprehension
+    if (last && positional.length === 1 && positional[0].type === 'Comprehension') {
+      const over = renderOverComprehension(node, last, positional[0]);
+      if (over) return over;
+    }
 
     if (spec) {
       let built = null;
@@ -738,6 +777,31 @@ function makeRenderer(opts) {
         return box('pm-ident', obj.html + fence(inner, '[', ']', false), node, ATOM, obj.tall);
       }
 
+      case 'Comprehension': {
+        const body = render(node.body);
+        return box('pm-comp',
+          body.html + '<span class="pm-op pm-op-bin">∣</span>' + bindingsHtml(node),
+          node, ADD, body.tall);
+      }
+
+      case 'Lambda': {
+        const params = node.params.map(function (p) { return render(p).html; })
+          .join('<span class="pm-punct">,</span><span class="pm-gap"></span>');
+        const body = render(node.body);
+        return box('pm-expr',
+          params + '<span class="pm-op pm-op-rel">↦</span>' + body.html, node, 2, body.tall);
+      }
+
+      case 'Cast': {
+        const inner = operand(node.arg, UNARY, 'right', 'u-');
+        const label = node.suffix
+          ? '<span class="pm-cast pm-cast-suffix">as ' + esc(node.name) + '</span>'
+          : '<span class="pm-cast">(' + esc(node.name) + ')</span>';
+        return box('pm-expr',
+          node.suffix ? inner.html + label : label + inner.html,
+          node, UNARY, inner.tall);
+      }
+
       case 'Spread': {
         const r = render(node.arg);
         return box('pm-expr',
@@ -845,6 +909,21 @@ function treeText(node, indent) {
     case 'KeyVal': label = 'argument ' + node.name; kids.push(node.value); break;
     case 'Transpose': label = 'transpose'; kids.push(node.arg); break;
     case 'Spread': label = 'spread ' + node.op; kids.push(node.arg); break;
+    case 'Cast': label = 'cast ' + node.name; kids.push(node.arg); break;
+    case 'Lambda':
+      label = 'function';
+      node.params.forEach(function (p) { kids.push(p); });
+      kids.push(node.body);
+      break;
+    case 'Comprehension':
+      label = 'comprehension';
+      kids.push(node.body);
+      node.clauses.forEach(function (c) {
+        c.targets.forEach(function (t) { kids.push(t); });
+        kids.push(c.iter);
+        c.conds.forEach(function (x) { kids.push(x); });
+      });
+      break;
     case 'Slice': label = 'slice'; node.parts.forEach(function (p) { kids.push(p); }); break;
   }
 

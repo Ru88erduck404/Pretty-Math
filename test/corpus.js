@@ -44,6 +44,15 @@ const RENDERS = [
   ['python', 'dydx = sp.diff(y, x)'],
   ['python', 'area = sp.integrate(f, (x, 0, 1))'],
   ['python', 'eq = sp.Eq(F, m * a)'],
+  ['python', 'total = sum(x**2 for x in values)'],
+  ['python', 'coords = [x * 2 for x in points]'],
+  ['python', 'ok = all(abs(r) < tol for r in residuals)'],
+  ['python', 'best = max(score(c) for c in candidates if c.valid)'],
+  ['python', 'g = lambda x: x**2 + 1'],
+  ['javascript', 'const f = (x) => x * 2;'],
+  ['java', 'double avg = (double) sum / count;'],
+  ['c', 'double r = (double)(a + b) / 2;'],
+  ['rust', 'let x = (a as f64) / (b as f64);'],
   ['javascript', 'const mid = lo + ((hi - lo) >> 1);'],
   ['javascript', 'const area = Math.PI * r ** 2;'],
   ['javascript', 'let ok = (a & mask) !== 0 && b > 0;'],
@@ -60,17 +69,11 @@ const RENDERS = [
 
 // Known gaps, kept explicit rather than silently failing.
 const REFUSES = [
-  ['python', 'total = sum(x**2 for x in values)'],   // comprehensions
-  ['python', 'coords = [x * 2 for x in points]'],
-  ['python', 'g = lambda x: x**2 + 1'],              // lambda
   ['python', 'label = f"value is {x:.2f}"'],         // f-strings
   ['python', 'd = {"a": 1, "b": 2}'],                // dict literals
   ['python', 'def area(r: float) -> float:'],        // signatures
   ['python', 'a, b = b, a + b'],                     // tuple assignment
   ['python', 'if (n := len(values)) > 10:'],         // walrus inside parens
-  ['javascript', 'const f = (x) => x * 2;'],         // arrow functions
-  ['java', 'double avg = (double) sum / count;'],    // C-style casts
-  ['rust', 'let x = (a as f64) / (b as f64);'],      // `as` casts
   ['python', 'x = '],                                // genuinely incomplete
   ['python', 'x = 1 +'],
   ['python', 'x = )bad(']
