@@ -1,0 +1,61 @@
+name: Publish
+
+# Pushing a version tag releases that version. A plain push to main does not,
+# so day-to-day commits never reach anyone's editor by accident.
+#
+#   npm version patch   (or edit "version" in package.json by hand)
+#   git push origin main --follow-tags
+#
+# Requires a repository secret VSCE_PAT holding an Azure DevOps personal access
+# token with the Marketplace > Manage scope. OVSX_PAT is optional and only used
+# if it is set, for publishing to Open VSX as well (that is what VSCodium uses).
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run the tests before releasing anything
+        run: |
+          node test/run.js
+          node test/host.js
+
+      - name: Check the tag matches the version in package.json
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          manifest="$(node -p "require('./package.json').version")"
+          if [ "$tag" != "$manifest" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $manifest" >&2
+            exit 1
+          fi
+          echo "Releasing $manifest"
+
+      - name: Build the .vsix
+        run: npx --yes @vscode/vsce package --no-dependencies --out pretty-math.vsix
+
+      - name: Attach the .vsix to the GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pretty-math.vsix
+          generate_release_notes: true
+
+      - name: Publish to the Visual Studio Marketplace
+        if: env.VSCE_PAT != ''
+        run: npx --yes @vscode/vsce publish --no-dependencies --packagePath pretty-math.vsix
+
+      - name: Publish to Open VSX
+        if: env.OVSX_PAT != ''
+        run: npx --yes ovsx publish pretty-math.vsix --pat "$OVSX_PAT"

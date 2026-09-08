@@ -9,9 +9,10 @@
   "engines": { "vscode": "^1.75.0" },
   "categories": ["Visualization", "Programming Languages", "Education"],
   "keywords": ["math", "formula", "latex", "equation", "expression", "pretty print"],
+  "icon": "media/marketplace-icon.png",
+  "galleryBanner": { "color": "#161b26", "theme": "dark" },
   "main": "./extension.js",
   "activationEvents": ["onView:prettyMath.view"],
-  "//extensionKind": "Only the editor API is used, never the filesystem, so this can run in the local UI host of a Remote-SSH / WSL / container window instead of being installed on the remote.",
   "extensionKind": ["ui", "workspace"],
   "contributes": {
     "viewsContainers": {

@@ -1,3 +1,7 @@
 test/**
 .vscode/**
+.github/**
+.git/**
+.gitattributes
+.gitignore
 *.vsix

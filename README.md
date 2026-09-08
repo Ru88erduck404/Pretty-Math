@@ -124,6 +124,34 @@ To build a `.vsix` (needs Node on PATH):
 npx @vscode/vsce package
 ```
 
+## Releasing
+
+Pushing to `main` runs the tests on Linux, macOS and Windows. It does **not**
+release anything — an ordinary push never reaches anyone's editor.
+
+A release happens when a version tag is pushed:
+
+```bash
+npm version patch      # or minor / major; edit package.json by hand if npm is absent
+git push origin main --follow-tags
+```
+
+The tag has to match the `version` field or the workflow stops. It then builds
+the `.vsix`, attaches it to a GitHub release, and publishes to whichever
+marketplaces have a token set as a repository secret:
+
+| Secret | Marketplace | Where it comes from |
+| --- | --- | --- |
+| `VSCE_PAT` | Visual Studio Marketplace | Azure DevOps personal access token, scope *Marketplace → Manage*, for the `ru88erduck404` publisher |
+| `OVSX_PAT` | Open VSX, which VSCodium uses | A token from open-vsx.org |
+
+Neither is required. With no secrets set the workflow still tests, builds, and
+attaches the `.vsix` to the GitHub release for hand installation.
+
+`extensionKind: ["ui", "workspace"]` lets the extension run in the local
+extension host of a Remote-SSH, WSL or dev-container window, since it only reads
+the editor API and never the filesystem — so one install covers every remote.
+
 ## Development
 
 ```bash
