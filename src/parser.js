@@ -174,6 +174,14 @@ class Parser {
         this.next();
         const name = this.next();
         base = this.node('Member', { obj: base, name: name.v }, base.s, name.e);
+      } else if (this.atOp(':') && this.peek(1).t === 'op' && this.peek(1).v === ':' &&
+                 this.peek(2).t === 'ident') {
+        // C++ and Rust scope resolution. Matched as two colons rather than one
+        // `::` token so that Python's arr[::2] still lexes as a slice.
+        this.next();
+        this.next();
+        const name = this.next();
+        base = this.node('Member', { obj: base, name: name.v }, base.s, name.e);
       } else if (this.atOp("'")) {
         const q = this.next();
         base = this.node('Transpose', { arg: base }, base.s, q.e);
@@ -199,6 +207,12 @@ class Parser {
 
   parseArgItem(allowSlice) {
     if (allowSlice && this.atOp(':')) return this.parseSlice(null, this.peek().s);
+    // Python's *args / **kwargs, and JavaScript's ...rest
+    if (this.atOp('*') || this.atOp('**')) {
+      const star = this.next();
+      const arg = this.parseExpr(0);
+      return this.node('Spread', { op: star.v, arg: arg }, star.s, arg.e);
+    }
     // Keyword argument: name=value (never a comparison, so no ambiguity)
     if (this.peek().t === 'ident' && this.peek(1).t === 'op' && this.peek(1).v === '=' &&
         !(this.peek(2).t === 'op' && this.peek(2).v === '=')) {

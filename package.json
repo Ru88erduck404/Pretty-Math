@@ -89,7 +89,7 @@
         "prettyMath.stripNamespaces": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["Math", "math", "np", "numpy", "cmath", "scipy", "torch", "jnp", "sp", "sym", "sympy", "smp", "self", "this"],
+          "default": ["Math", "math", "np", "numpy", "cmath", "scipy", "torch", "jnp", "sp", "sym", "sympy", "smp", "std", "self", "this"],
           "markdownDescription": "Qualifiers dropped before rendering, so `np.sqrt(x)` reads as a plain root and `self.mass` as `mass`."
         },
         "prettyMath.showLatex": {
@@ -111,7 +111,7 @@
     }
   },
   "scripts": {
-    "test": "node test/run.js",
+    "test": "node test/run.js && node test/host.js && node test/corpus.js",
     "package": "npx --yes @vscode/vsce package"
   },
   "repository": { "type": "git", "url": "https://github.com/Ru88erduck404/Pretty-Math.git" },

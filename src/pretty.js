@@ -29,8 +29,11 @@ function renderChunk(chunk, flavor, config) {
     ast = parse(chunk.text, flavor);
   } catch (err) {
     const pos = typeof err.pos === 'number' ? err.pos : 0;
+    const deep = /call stack/i.test(err.message || '');
     result.error = {
-      message: err.message || String(err),
+      message: deep
+        ? 'This expression nests too deeply to read. Select a smaller part of it.'
+        : (err.message || String(err)),
       pos: pos,
       docPos: mapOffset(pos),
       snippet: esc(chunk.text),
@@ -54,7 +57,16 @@ function renderChunk(chunk, flavor, config) {
   try {
     result.html = makeRenderer(opts)(ast);
   } catch (err) {
-    result.error = { message: 'Could not draw this expression: ' + (err.message || err), pos: 0, docPos: result.docStart, snippet: esc(chunk.text), caret: '' };
+    const deep = /call stack/i.test(err.message || '');
+    result.error = {
+      message: deep
+        ? 'This expression nests too deeply to draw. Select a smaller part of it.'
+        : 'Could not draw this expression: ' + (err.message || err),
+      pos: 0,
+      docPos: result.docStart,
+      snippet: esc(chunk.text),
+      caret: ''
+    };
     return result;
   }
 

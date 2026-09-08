@@ -159,6 +159,7 @@ the editor API and never the filesystem — so one install covers every remote.
 ```bash
 node test/run.js     # parser, renderer and LaTeX output
 node test/host.js    # extension host against a stubbed VS Code API
+node test/corpus.js  # real source lines: no crashes, no hangs, offsets intact
 node test/demo.js    # writes test/demo.html to eyeball the layout in a browser
 ```
 

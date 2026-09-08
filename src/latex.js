@@ -352,8 +352,13 @@ function toLatex(node, opts) {
       }
       case 'Index': {
         const inner = n.args.map(function (x) { return go(x).tex; }).join(',');
+        // A slice is not a subscript; keep the brackets, as the panel does.
+        const sliced = n.args.some(function (x) { return x.type === 'Slice'; });
+        if (sliced) return res(go(n.obj).tex + '\\left[' + inner + '\\right]');
         return res(go(n.obj).tex + '_{' + inner + '}');
       }
+      case 'Spread':
+        return res('{' + n.op.replace(/\*/g, '\\ast ') + '}' + go(n.arg).tex);
       case 'Slice':
         return res(n.parts.map(function (p) { return p ? go(p).tex : ''; }).join(':'));
       case 'Call':

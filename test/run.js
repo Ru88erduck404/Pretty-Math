@@ -81,6 +81,17 @@ check('index subscript', tex('a[i] * b[i + 1]'), 'a_{i} \\cdot b_{i + 1}');
 check('ternary cases', tex('x if x > 0 else -x'), /begin\{cases\}/);
 check('scientific notation', tex('1.5e-3 * x'), '1.5 \\times 10^{-3} \\cdot x');
 
+// ---- identifiers and scope resolution -------------------------------------
+check('unicode identifiers', tex('længde = bredde * højde'),
+  '\\mathrm{længde} = \\mathrm{bredde} \\cdot \\mathrm{højde}');
+check('accented single letters stay italic', tex('é = 2'), 'é = 2');
+check('C++ scope resolution', tex('d = std::sqrt(x)', 'cpp'), 'd = \\sqrt{x}');
+check('scope resolution keeps unknown namespaces', tex('y = ns::f(x)', 'cpp'),
+  'y = \\operatorname{f}\\left(x\\right)');
+check('python slice still works', tex('y = arr[::2]'), 'y = \\mathrm{arr}\\left[::2\\right]');
+check('plain index is a subscript', tex('y = arr[i]'), 'y = \\mathrm{arr}_{i}');
+check('star args parse', tex('y = f(*args)'), 'y = \\operatorname{f}\\left({\\ast }\\mathrm{args}\\right)');
+
 // ---- bitwise vs comparison, which the languages genuinely disagree on ------
 // Python masks then compares; C compares then masks, the classic C bug.
 check('python masks then compares', tex('flags & 0xFF == 0', 'python'),

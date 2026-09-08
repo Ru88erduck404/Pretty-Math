@@ -57,7 +57,14 @@ const SAMPLES = [
   ['python', 'eq = sp.Eq(F, m * sp.diff(x, t, 2))'],
   ['python', 's = sp.Sum(1 / n**2, (n, 1, sp.oo))'],
   ['python', 'L = sp.limit(sp.sin(x) / x, x, 0)'],
-  ['python', 'd = np.diff(samples)']
+  ['python', 'd = np.diff(samples)'],
+
+  ['python', 'ok = flags & 0xFF == 0'],
+  ['c', 'ok = flags & 0xFF == 0;'],
+  ['python', 'inside = 0 <= i < n'],
+  ['c', 'inside = 0 <= i < n;'],
+  ['cpp', 'double d = std::sqrt(dx*dx + dy*dy);'],
+  ['python', 'længde = np.sqrt(bredde**2 + højde**2)']
 ];
 
 const FROM = Number(process.argv[2] || 0);

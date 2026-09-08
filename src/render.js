@@ -738,6 +738,12 @@ function makeRenderer(opts) {
         return box('pm-ident', obj.html + fence(inner, '[', ']', false), node, ATOM, obj.tall);
       }
 
+      case 'Spread': {
+        const r = render(node.arg);
+        return box('pm-expr',
+          '<span class="pm-punct">' + esc(node.op) + '</span>' + r.html, node, ATOM, r.tall);
+      }
+
       case 'Slice': {
         const parts = node.parts.map(function (p) { return p ? render(p).html : ''; });
         return box('pm-slice', parts.join('<span class="pm-punct">:</span>'), node, ATOM, false);
@@ -838,6 +844,7 @@ function treeText(node, indent) {
     case 'List': label = 'list ' + node.kind; node.items.forEach(function (a) { kids.push(a); }); break;
     case 'KeyVal': label = 'argument ' + node.name; kids.push(node.value); break;
     case 'Transpose': label = 'transpose'; kids.push(node.arg); break;
+    case 'Spread': label = 'spread ' + node.op; kids.push(node.arg); break;
     case 'Slice': label = 'slice'; node.parts.forEach(function (p) { kids.push(p); }); break;
   }
 

@@ -9,8 +9,10 @@ const OPS = [
   '.', ',', '(', ')', '[', ']', '{', '}', '@', '\\', ';', '$'
 ];
 
-const ID_START = /[A-Za-z_$Ͱ-Ͽµ]/;
-const ID_PART = /[A-Za-z0-9_$Ͱ-Ͽµ]/;
+// Any Unicode letter, so identifiers like `længde`, `Ströme` or `Δt` lex the
+// same as ASCII ones.
+const ID_START = /[\p{L}\p{Nl}_$]/u;
+const ID_PART = /[\p{L}\p{Nl}\p{Nd}\p{Mn}\p{Mc}_$]/u;
 
 class LexError extends Error {
   constructor(message, pos) {

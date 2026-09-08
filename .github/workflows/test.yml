@@ -27,3 +27,6 @@ jobs:
 
       - name: Extension host
         run: node test/host.js
+
+      - name: Corpus of real source lines
+        run: node test/corpus.js

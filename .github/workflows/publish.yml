@@ -36,6 +36,7 @@ jobs:
         run: |
           node test/run.js
           node test/host.js
+          node test/corpus.js
 
       - name: Check the tag matches the version in package.json
         run: |
