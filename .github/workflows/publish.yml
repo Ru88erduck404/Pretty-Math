@@ -37,6 +37,7 @@ jobs:
           node test/run.js
           node test/host.js
           node test/corpus.js
+          node test/fuzz.js
 
       - name: Check the tag matches the version in package.json
         run: |

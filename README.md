@@ -17,11 +17,17 @@ w_i  =  w_i  −  ──────────
 The point is not decoration. `a / b * c` draws only `b` under the bar, so the
 classic precedence slip is visible instead of inferred.
 
-<!-- Capture these two from a running editor; see docs/README.md for how.
-     Delete this comment once the files exist. -->
+<!-- Screenshots: capture them as described in docs/README.md, save them as
+     docs/panel.png and docs/precedence.png, then delete these two comment
+     markers so the images below show. Until the files exist the links would
+     render as broken images, which is why they are commented out.
+
 ![The quadratic formula rendered in the panel](docs/panel.png)
 
 ![The same line with and without brackets](docs/precedence.png)
+
+-->
+<!-- end screenshots -->
 
 ## Using it
 
@@ -170,6 +176,7 @@ the editor API and never the filesystem — so one install covers every remote.
 node test/run.js     # parser, renderer and LaTeX output
 node test/host.js    # extension host against a stubbed VS Code API
 node test/corpus.js  # real source lines: no crashes, no hangs, offsets intact
+node test/fuzz.js    # generated and corrupted expressions; PRETTY_MATH_SEED to vary
 node test/demo.js    # writes test/demo.html to eyeball the layout in a browser
 ```
 
