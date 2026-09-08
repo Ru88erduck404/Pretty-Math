@@ -4,6 +4,13 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.1] — 2026-09-08
+
+### Fixed
+
+- Repository, issues and homepage links point at the real repository name, so
+  the Marketplace listing resolves them correctly.
+
 ## [0.1.0] — 2026-09-08
 
 First release.

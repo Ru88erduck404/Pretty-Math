@@ -2,7 +2,7 @@
   "name": "pretty-math",
   "displayName": "Pretty Math",
   "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "ru88erduck404",
   "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
   "license": "MIT",
@@ -114,6 +114,7 @@
     "test": "node test/run.js",
     "package": "npx --yes @vscode/vsce package"
   },
-  "repository": { "type": "git", "url": "https://github.com/Ru88erduck404/pretty-math" },
-  "bugs": { "url": "https://github.com/Ru88erduck404/pretty-math/issues" }
+  "repository": { "type": "git", "url": "https://github.com/Ru88erduck404/Pretty-Math.git" },
+  "bugs": { "url": "https://github.com/Ru88erduck404/Pretty-Math/issues" },
+  "homepage": "https://github.com/Ru88erduck404/Pretty-Math#readme"
 }
