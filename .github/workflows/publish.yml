@@ -18,6 +18,10 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Needed to create the GitHub release; new repositories give workflows
+    # read-only access by default.
+    permissions:
+      contents: write
     env:
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
