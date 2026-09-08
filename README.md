@@ -43,6 +43,8 @@ where most of the value is:
 | `math.hypot(dx, dy)` | √(dx² + dy²) | the identity behind the call |
 | `math.sin(t) ** 2` | sin² t | |
 | `a ^ b` | a ⊕ b in C/Python/JS, aᵇ in MATLAB/Julia/R | `^` is XOR in most languages |
+| `flags & 0xFF == 0` | (flags & 0xFF) = 0 in Python; flags & (0xFF = 0) in C | `&` binds tighter than `==` in Python, looser in C |
+| `0 <= i < n` | a chain in Python; (0 ≤ i) < n in C and JS | only some languages chain comparisons |
 | `n // 2` | ⌊n/2⌋ in Python; a comment elsewhere | |
 | `a and b or c` | (a ∧ b) ∨ c | grouping drawn where precedence is easy to misread |
 | `a + b << c` | (a + b) ≪ c | same |

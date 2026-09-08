@@ -2,7 +2,7 @@
 
 const { analyze } = require('../src/pretty');
 const { flavorFor } = require('../src/flavors');
-const { parse } = require('../src/parser');
+const { parse, precedenceFor } = require('../src/parser');
 const { toLatex } = require('../src/latex');
 const prep = require('../src/prep');
 
@@ -31,7 +31,11 @@ function check(name, actual, expected) {
 
 function tex(src, lang) {
   const f = flavorFor(lang || 'python', CFG);
-  return toLatex(parse(src, f), { stripNamespaces: CFG.stripNamespaces });
+  return toLatex(parse(src, f), {
+    stripNamespaces: CFG.stripNamespaces,
+    prec: precedenceFor(f),
+    chainsComparisons: f.chainsComparisons
+  });
 }
 
 function one(src, lang, cursor) {
@@ -76,6 +80,26 @@ check('self stripped', tex('self.mass * self.v ** 2 / 2'), '\\frac{\\mathrm{mass
 check('index subscript', tex('a[i] * b[i + 1]'), 'a_{i} \\cdot b_{i + 1}');
 check('ternary cases', tex('x if x > 0 else -x'), /begin\{cases\}/);
 check('scientific notation', tex('1.5e-3 * x'), '1.5 \\times 10^{-3} \\cdot x');
+
+// ---- bitwise vs comparison, which the languages genuinely disagree on ------
+// Python masks then compares; C compares then masks, the classic C bug.
+check('python masks then compares', tex('flags & 0xFF == 0', 'python'),
+  '\\left(\\mathrm{flags} \\mathbin{\\&} \\mathtt{0xFF}\\right) = 0');
+check('C compares then masks', tex('flags & 0xFF == 0', 'c'),
+  '\\mathrm{flags} \\mathbin{\\&} \\left(\\mathtt{0xFF} = 0\\right)');
+check('javascript follows C', tex('flags & 0xFF == 0', 'javascript'),
+  '\\mathrm{flags} \\mathbin{\\&} \\left(\\mathtt{0xFF} = 0\\right)');
+check('julia follows python', tex('flags & 0xFF == 0', 'julia'),
+  '\\left(\\mathrm{flags} \\mathbin{\\&} \\mathtt{0xFF}\\right) = 0');
+check('C relational binds tighter than equality', tex('a == b < c', 'c'),
+  'a = \\left(b < c\\right)');
+check('python chains comparisons', tex('0 <= i < n', 'python'), '0 \\leq i < n');
+check('C does not chain comparisons', tex('0 <= i < n', 'c'),
+  '\\left(0 \\leq i\\right) < n');
+check('hex literals survive intact', tex('mask = 0xFF + 0b1010 + 0o17'),
+  '\\mathrm{mask} = \\mathtt{0xFF} + \\mathtt{0b1010} + \\mathtt{0o17}');
+check('C float suffix is still stripped', tex('x = 1.5f * 2L', 'c'),
+  'x = 1.5 \\cdot 2');
 
 // ---- calculus -------------------------------------------------------------
 check('derivative of a name', tex('sp.diff(f, x)'), '\\frac{\\mathrm{d} f}{\\mathrm{d} x}');

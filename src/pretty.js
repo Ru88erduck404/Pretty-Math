@@ -2,7 +2,7 @@
 
 const { flavorFor } = require('./flavors');
 const { statementsAt } = require('./prep');
-const { parse } = require('./parser');
+const { parse, precedenceFor } = require('./parser');
 const { makeRenderer, treeText, esc } = require('./render');
 const { toLatex } = require('./latex');
 
@@ -41,6 +41,8 @@ function renderChunk(chunk, flavor, config) {
 
   const opts = {
     map: mapOffset,
+    prec: precedenceFor(flavor),
+    chainsComparisons: flavor.chainsComparisons,
     multiplication: config.multiplication,
     indexAsSubscript: config.indexAsSubscript,
     greek: config.greekLetters,

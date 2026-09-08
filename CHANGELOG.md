@@ -8,6 +8,19 @@ All notable changes to Pretty Math are recorded here. The format follows
 
 ### Fixed
 
+- Bitwise operators are now read per language. Python and Julia bind `&` tighter
+  than `==`, so `flags & 0xFF == 0` masks then compares; C and its descendants
+  bind it looser, making the same line `flags & (0xFF == 0)`. Both were
+  previously drawn the Python way, which misrepresented C in exactly the case
+  the panel exists to expose. In C, equality is also drawn as looser than the
+  relational operators.
+- Comparisons only chain where the language chains them. `0 <= i < n` stays a
+  chain in Python and Julia but is drawn as `(0 <= i) < n` in C, JavaScript and
+  the rest, because that is what those languages compute.
+- A comparison beside a bitwise operator is always bracketed, in either
+  direction, since that grouping is the one that differs between languages.
+- Hexadecimal, binary and octal literals are no longer truncated: `0xFF` was
+  drawn as `0xF`, because the C numeric-suffix stripper ate the final digit.
 - Repository, issues and homepage links point at the real repository name, so
   the Marketplace listing resolves them correctly.
 

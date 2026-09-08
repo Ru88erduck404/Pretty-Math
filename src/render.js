@@ -18,11 +18,22 @@ const ASSOCIATIVE = new Set(['+', '*', '&&', '||', 'and', 'or', '&', '|', 'xor',
 const MURKY = new Set(['&&', '||', 'and', 'or', '&', '|', 'xor', '<<', '>>', '>>>']);
 const SHIFTS = new Set(['<<', '>>', '>>>']);
 const ARITHMETIC = new Set(['+', '-', '*', '/', '%', '//', '**']);
+const BITWISE = new Set(['&', '|', 'xor', '<<', '>>', '>>>']);
+const COMPARE = new Set(['==', '!=', '===', '!==', '<', '>', '<=', '>=']);
 
-function murkyMix(parentOp, child) {
-  if (!MURKY.has(parentOp) || !child || child.type !== 'Binary') return false;
-  if (MURKY.has(child.op) && child.op !== parentOp) return true;
-  return SHIFTS.has(parentOp) && ARITHMETIC.has(child.op);
+function murkyMix(parentOp, child, chains) {
+  if (!child || child.type !== 'Binary') return false;
+  const c = child.op;
+  // Bitwise next to a comparison is the one mix whose grouping differs between
+  // languages, so it is always drawn -- in either direction.
+  if (BITWISE.has(parentOp) && COMPARE.has(c)) return true;
+  if (COMPARE.has(parentOp) && BITWISE.has(c)) return true;
+  // Only some languages chain comparisons. Where they do not, `0 < i < n` is
+  // really `(0 < i) < n`, and drawing it as a chain would hide that.
+  if (COMPARE.has(parentOp) && COMPARE.has(c)) return !chains;
+  if (!MURKY.has(parentOp)) return false;
+  if (MURKY.has(c) && c !== parentOp) return true;
+  return SHIFTS.has(parentOp) && ARITHMETIC.has(c);
 }
 
 function esc(s) {
@@ -40,6 +51,8 @@ function defaults(opts) {
     greek: o.greek !== false,
     expandIdentities: o.expandIdentities !== false,
     derivativeSymbol: o.derivativeSymbol || 'auto',
+    prec: o.prec || PREC,
+    chains: o.chainsComparisons !== false,
     strip: new Set(o.stripNamespaces || [])
   };
 }
@@ -78,7 +91,7 @@ function makeRenderer(opts) {
     const same = r.prec === minPrec;
     const need = r.prec < minPrec ||
       (same && side === 'right' && !ASSOCIATIVE.has(parentOp)) ||
-      murkyMix(parentOp, node);
+      murkyMix(parentOp, node, o.chains);
     if (!need) return r;
     return { html: fence(r.html, '(', ')', r.tall), prec: ATOM, tall: r.tall };
   }
@@ -640,7 +653,7 @@ function makeRenderer(opts) {
       return renderPower(node.l, node.r, node);
     }
 
-    const prec = PREC[opv];
+    const prec = o.prec[opv];
     const l = operand(node.l, prec, 'left', opv);
     const r = operand(node.r, prec, 'right', opv);
 
@@ -661,7 +674,15 @@ function makeRenderer(opts) {
   function render(node) {
     switch (node.type) {
       case 'Num': {
-        let text = node.v.replace(/_/g, '').replace(/[fFlLuUdD]$/, '');
+        // Strip a C numeric suffix, but never from 0xFF / 0b01 / 0o77, where the
+        // trailing character is part of the value.
+        const based = /^0[xXbBoO]/.test(node.v);
+        let text = node.v.replace(/_/g, '');
+        if (!based) text = text.replace(/[fFlLuUdD]$/, '');
+        if (based) {
+          return box('pm-numlit', '<span class="pm-num-lit">' + esc(text) + '</span>',
+            node, ATOM, false);
+        }
         text = text.replace(/[eE]([+-]?\d+)$/, function (_, exp) {
           return '×10^{' + exp + '}';
         });

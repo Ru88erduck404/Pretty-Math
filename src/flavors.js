@@ -20,6 +20,20 @@ const EXCL_COMMENT = new Set(['fortran', 'fortran-free-form', 'FortranFreeForm']
 const WORD_LOGIC = new Set(['python', 'ruby', 'coffeescript', 'nim', 'elixir', 'sql', 'plaintext']);
 const MATRIX_OPS = new Set(['matlab', 'octave', 'julia']);
 
+// Where do bitwise operators sit relative to comparisons? Python and Julia bind
+// `&` tighter than `==`, so `flags & 0xFF == 0` compares the masked value. C and
+// its descendants do the opposite — `&` is looser, so the same line means
+// `flags & (0xFF == 0)`, the classic C bug. Reading this the same way in both
+// would make the panel lie about exactly what it exists to reveal.
+const BITWISE_BINDS_TIGHTER = new Set([
+  'python', 'cython', 'julia', 'ruby', 'nim', 'coffeescript', 'plaintext'
+]);
+
+// Languages where `0 < i < n` means what it means in maths. Everywhere else it
+// is `(0 < i) < n` — a comparison against a boolean — so the panel must not
+// draw it as a chain.
+const CHAINS_COMPARISONS = new Set(['python', 'cython', 'julia', 'coffeescript', 'plaintext']);
+
 function flavorFor(languageId, config) {
   const id = String(languageId || 'plaintext');
   const caretCfg = (config && config.caretMeansPower) || 'auto';
@@ -40,6 +54,8 @@ function flavorFor(languageId, config) {
       EXCL_COMMENT.has(id) ? '!' : '//',
     blockComment: !HASH_COMMENT.has(id) && !PERCENT_COMMENT.has(id),
     wordLogic: WORD_LOGIC.has(id),
+    bitwiseBindsTighter: BITWISE_BINDS_TIGHTER.has(id),
+    chainsComparisons: CHAINS_COMPARISONS.has(id),
     matrixOps: MATRIX_OPS.has(id),
     // In MATLAB/Octave a trailing quote is transpose, not a string.
     transposeQuote: MATRIX_OPS.has(id) && id !== 'julia',

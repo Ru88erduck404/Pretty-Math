@@ -9,8 +9,8 @@ class ParseError extends Error {
   }
 }
 
-// Binding powers. Higher binds tighter. Mirrors Python/C precedence, which the
-// mainstream languages agree on for everything that matters here.
+// Binding powers. Higher binds tighter. Python-family table: bitwise operators
+// bind tighter than comparisons, so `flags & 0xFF == 0` masks then compares.
 const PREC = {
   '||': 4, 'or': 4,
   '&&': 6, 'and': 6,
@@ -24,6 +24,21 @@ const PREC = {
   '*': 22, '/': 22, '%': 22, '//': 22, '@': 22, '.*': 22, './': 22, 'mod': 22, 'div': 22,
   '**': 26, '.^': 26
 };
+// C-family table: bitwise operators are looser than comparisons, and equality is
+// looser than the relational operators. In C, `flags & 0xFF == 0` is
+// `flags & (0xFF == 0)`, which is almost never what the author meant.
+const PREC_C = Object.assign({}, PREC, {
+  '|': 7,
+  'xor': 8,
+  '&': 9,
+  '==': 10, '!=': 10, '===': 10, '!==': 10,
+  '<': 11, '>': 11, '<=': 11, '>=': 11, 'in': 11, 'is': 11
+});
+
+function precedenceFor(flavor) {
+  return (flavor && flavor.bitwiseBindsTighter) ? PREC : PREC_C;
+}
+
 const RIGHT_ASSOC = new Set(['**', '.^']);
 const COMPARISON = new Set(['==', '!=', '===', '!==', '<', '>', '<=', '>=', 'in', 'is']);
 const PREFIX_PREC = 24;
@@ -34,6 +49,7 @@ class Parser {
   constructor(src, flavor) {
     this.src = src;
     this.f = flavor || {};
+    this.prec = precedenceFor(this.f);
     this.toks = tokenize(src, this.f);
     this.i = 0;
   }
@@ -70,7 +86,7 @@ class Parser {
     if (v === '^') v = this.f.caretIsPower ? '**' : 'xor';
     if (v === '~=') v = '!=';
     if (v === '//' && !this.f.floorDiv) return null;
-    if (Object.prototype.hasOwnProperty.call(PREC, v)) return v;
+    if (Object.prototype.hasOwnProperty.call(this.prec, v)) return v;
     return null;
   }
 
@@ -113,7 +129,7 @@ class Parser {
 
       const op = this.infix();
       if (op === null) break;
-      const bp = PREC[op];
+      const bp = this.prec[op];
       if (bp < minBp) break;
       const rightBp = RIGHT_ASSOC.has(op) ? bp : bp + 1;
       this.next();
@@ -262,5 +278,7 @@ module.exports = {
   ParseError: ParseError,
   dottedName: dottedName,
   PREC: PREC,
+  PREC_C: PREC_C,
+  precedenceFor: precedenceFor,
   COMPARISON: COMPARISON
 };

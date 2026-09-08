@@ -13,11 +13,18 @@ const ASSOCIATIVE = new Set(['+', '*', '&&', '||', 'and', 'or', '&', '|', 'xor']
 const MURKY = new Set(['&&', '||', 'and', 'or', '&', '|', 'xor', '<<', '>>', '>>>']);
 const SHIFTS = new Set(['<<', '>>', '>>>']);
 const ARITHMETIC = new Set(['+', '-', '*', '/', '%', '//', '**']);
+const BITWISE = new Set(['&', '|', 'xor', '<<', '>>', '>>>']);
+const COMPARE = new Set(['==', '!=', '===', '!==', '<', '>', '<=', '>=']);
 
-function murkyMix(parentOp, child) {
-  if (!MURKY.has(parentOp) || !child || child.type !== 'Binary') return false;
-  if (MURKY.has(child.op) && child.op !== parentOp) return true;
-  return SHIFTS.has(parentOp) && ARITHMETIC.has(child.op);
+function murkyMix(parentOp, child, chains) {
+  if (!child || child.type !== 'Binary') return false;
+  const c = child.op;
+  if (BITWISE.has(parentOp) && COMPARE.has(c)) return true;
+  if (COMPARE.has(parentOp) && BITWISE.has(c)) return true;
+  if (COMPARE.has(parentOp) && COMPARE.has(c)) return !chains;
+  if (!MURKY.has(parentOp)) return false;
+  if (MURKY.has(c) && c !== parentOp) return true;
+  return SHIFTS.has(parentOp) && ARITHMETIC.has(c);
 }
 
 function isHalf(n) {
@@ -88,7 +95,7 @@ function toLatex(node, opts) {
     const r = go(n);
     const need = r.prec < minPrec ||
       (r.prec === minPrec && side === 'right' && !ASSOCIATIVE.has(parentOp)) ||
-      murkyMix(parentOp, n);
+      murkyMix(parentOp, n, o.chainsComparisons !== false);
     return need ? '\\left(' + r.tex + '\\right)' : r.tex;
   }
 
@@ -323,7 +330,11 @@ function toLatex(node, opts) {
   function go(n) {
     switch (n.type) {
       case 'Num': {
-        const t = n.v.replace(/_/g, '').replace(/[fFlLuUdD]$/, '');
+        // A trailing letter in 0xFF is part of the number, not a C suffix.
+        const based = /^0[xXbBoO]/.test(n.v);
+        const t = based ? n.v.replace(/_/g, '')
+          : n.v.replace(/_/g, '').replace(/[fFlLuUdD]$/, '');
+        if (based) return res('\\mathtt{' + t + '}');
         const m = /^([0-9.]+)[eE]([+-]?\d+)$/.exec(t);
         if (m) return res(m[1] + ' \\times 10^{' + m[2].replace(/^\+/, '') + '}', MUL);
         return res(t);
@@ -384,7 +395,7 @@ function toLatex(node, opts) {
           const b = needs ? '\\left(' + base.tex + '\\right)' : base.tex;
           return res(b + '^{' + go(n.r).tex + '}', POWER);
         }
-        const prec = PREC[n.op];
+        const prec = (o.prec || PREC)[n.op];
         const l = operand(n.l, prec, 'left', n.op);
         const r = operand(n.r, prec, 'right', n.op);
         if (n.op === '*' || n.op === '@') return res(l + ' \\cdot ' + r, prec);
