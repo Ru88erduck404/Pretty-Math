@@ -18,6 +18,14 @@ const { evaluate, formatNumber } = require('./evaluate');
 // `name = rest`, allowing a type annotation and an augmented operator.
 const ASSIGN = /^([A-Za-z_$À-￿][\w$.À-￿]*)\s*(?::\s*[^=]+?\s*)?(=|\+=|-=|\*=|\/=|\*\*=|:=)\s*(.+)$/;
 
+// Does this right-hand side refer to `name`? Word-boundary matching is enough:
+// a false positive only costs us a value we would rather not trust anyway.
+function mentions(rhs, name, flavor) {
+  const bare = name.split('.').pop();
+  const pattern = new RegExp('(^|[^\\w$.])' + bare.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b');
+  return pattern.test(rhs);
+}
+
 function cleanLine(raw, flavor) {
   const chunk = flatten(stripComments(fromDocument(raw, 0), flavor));
   return stripScaffolding(chunk).text;
@@ -56,6 +64,21 @@ function collectValues(text, languageId, config) {
     // A comparison, not an assignment.
     if (/^=/.test(rhs)) continue;
 
+    // A name defined in terms of itself is a running total or a loop update:
+    // `velocity = velocity - g * dt` has a different value on every pass, so
+    // folding one iteration would produce a number that is precise and false.
+    // The same goes for `total += x`, which is self-referential by definition.
+    if (op !== '=' && op !== ':=') {
+      delete env[name];
+      delete out[name];
+      continue;
+    }
+    if (mentions(rhs, name, flavor)) {
+      delete env[name];
+      delete out[name];
+      continue;
+    }
+
     let value = null;
     try {
       const ast = parse(rhs, flavor);
@@ -70,17 +93,6 @@ function collectValues(text, languageId, config) {
       delete env[name];
       delete out[name];
       continue;
-    }
-
-    if (op !== '=' && op !== ':=') {
-      const before = env[name];
-      if (typeof before !== 'number') { delete env[name]; delete out[name]; continue; }
-      if (op === '+=') value = before + value;
-      else if (op === '-=') value = before - value;
-      else if (op === '*=') value = before * value;
-      else if (op === '/=') value = value === 0 ? null : before / value;
-      else if (op === '**=') value = Math.pow(before, value);
-      if (value === null) { delete env[name]; delete out[name]; continue; }
     }
 
     const shown = formatNumber(value, digits);

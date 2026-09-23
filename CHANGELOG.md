@@ -19,6 +19,10 @@ All notable changes to Pretty Math are recorded here. The format follows
 - Names that are being assigned, bound by a comprehension or a lambda, or that
   are the variable of a derivative or integral are left as names, since a value
   would be wrong or meaningless there. Non-numeric values are left alone too.
+- A name defined in terms of itself — a loop update or a running total — gets no
+  value from the file, because one folded iteration would be precise and false.
+  The debugger still shows its real value.
+- `docs/values.py`, a runnable file for trying both modes.
 
 ### Fixed
 

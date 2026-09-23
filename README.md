@@ -128,6 +128,11 @@ Read values are a static guess: the last assignment before the cursor wins,
 whether or not the code would have taken that branch. Live values have no such
 problem, which is why they win when both exist.
 
+A name defined in terms of itself — `velocity = velocity - g * dt`, or
+`total += x` — gets no value at all. Those change on every pass, so folding one
+iteration would produce a number that is precise and false. Under the debugger
+they show their real current value, which is the whole point of stepping.
+
 Some things are deliberately never substituted:
 
 - the name being assigned, so `E = 0.5*m*v**2` keeps its `E`;

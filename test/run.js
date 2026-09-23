@@ -109,6 +109,10 @@ const FILE = [
   'unknown = some_call(1)',
   'later = 5',
   'later = other',
+  'running = 0',
+  'running = running + 1',
+  'tally = 5',
+  'tally += 2',
   ''
 ].join('\n');
 
@@ -121,6 +125,10 @@ check('known function folded', vals.r.text, '4');
 check('qualifier stripped name recorded', vals.mass.text, '2.5');
 check('unknown right-hand side ignored', vals.unknown, undefined);
 check('reassignment to something unknown forgets the value', vals.later, undefined);
+// A running total has a different value on every pass; one folded iteration
+// would be precise and false.
+check('self-referential assignment has no static value', vals.running, undefined);
+check('augmented assignment has no static value', vals.tally, undefined);
 
 // Numbers that end up side by side must be separated, or 0.5 · 3 · 12² would be
 // drawn as "0.5 3 12".
