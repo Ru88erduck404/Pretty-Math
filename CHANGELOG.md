@@ -4,6 +4,27 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.4] — 2026-09-23
+
+### Fixed
+
+- `import` and `from` lines, and other statements that are not expressions
+  (`def`, `class`, `#include`, `export function`), are ignored instead of being
+  reported as parse errors. There was never any maths on those lines.
+- String contents are kept. `cn.value("Bohr radius")` was drawn as `value("")`,
+  because the text inside quotes was blanked while comments were stripped.
+- Tuple assignment parses, so `x, y = sp.symbols("x y")` is drawn rather than
+  refused.
+
+### Added
+
+- Module aliases declared by the file become qualifiers, so after
+  `from scipy import constants as cn` the term `cn.R` is drawn as `R`, the way
+  `np.` and `math.` are dropped by default.
+- Live value lookups are cached against the debug frame and time out after
+  1.5 seconds, so a slow or stuck debug adapter is not re-queried on every
+  cursor move, nor waited on indefinitely.
+
 ## [0.1.3] — 2026-09-23
 
 ### Added

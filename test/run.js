@@ -81,6 +81,45 @@ check('index subscript', tex('a[i] * b[i + 1]'), 'a_{i} \\cdot b_{i + 1}');
 check('ternary cases', tex('x if x > 0 else -x'), /begin\{cases\}/);
 check('scientific notation', tex('1.5e-3 * x'), '1.5 \\times 10^{-3} \\cdot x');
 
+// ---- a real SymPy / SciPy file --------------------------------------------
+const SCIPY = [
+  'import sympy as sp',
+  'from scipy import constants as cn',
+  'x,y = sp.symbols("x y")',
+  'a0 = cn.value("Bohr radius")',
+  'g=3',
+  'eq1 = sp.Eq(1+x,sp.sqrt(y**-3)*a0*cn.R)',
+  ''
+].join('\n');
+
+function atLine(file, needle, cfg) {
+  const at = file.indexOf(needle) + 2;
+  return analyze(file, { start: at, end: at }, 'python', cfg || CFG).statements[0];
+}
+
+check('import lines are not an error', atLine(SCIPY, 'import sympy'), undefined);
+check('from-import lines are not an error', atLine(SCIPY, 'from scipy'), undefined);
+check('tuple assignment parses',
+  !!atLine(SCIPY, 'x,y =') && !atLine(SCIPY, 'x,y =').error, true);
+check('tuple assignment keeps both names',
+  atLine(SCIPY, 'x,y =').latex, 'x, y = \\operatorname{symbols}\\left(\\text{"x y"}\\right)');
+// A string used to be blanked out, so value("Bohr radius") was drawn as value("").
+check('string contents survive',
+  atLine(SCIPY, 'a0 =').html.indexOf('Bohr radius') >= 0, true);
+
+const { importAliases } = require('../src/values');
+check('import aliases found', importAliases(SCIPY).join(','), 'sp,cn');
+check('plain from-import is a qualifier too',
+  importAliases('from scipy import constants\n').join(','), 'constants');
+check('a plain import is not', importAliases('import math\n').join(','), '');
+
+const ALIASED = Object.assign({}, CFG, {
+  stripNamespaces: CFG.stripNamespaces.concat(importAliases(SCIPY))
+});
+check('an aliased module is dropped from the drawing',
+  atLine(SCIPY, 'eq1 =', ALIASED).latex,
+  '\\mathrm{eq}_{1} = 1 + x = \\sqrt{y^{-3}} \\cdot a_{0} \\cdot R');
+
 // ---- substituting variable values -----------------------------------------
 const { collectValues, valuesFromDebugger } = require('../src/values');
 const { evaluate, formatNumber } = require('../src/evaluate');

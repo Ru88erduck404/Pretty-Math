@@ -449,6 +449,7 @@ function toLatex(node, opts) {
         return res('\\mathrm{' + n.name + '} = ' + go(n.value).tex, 1);
       case 'List': {
         const inner = n.items.map(function (x) { return go(x).tex; }).join(', ');
+        if (n.kind === ',') return res(inner, 2);
         const open = n.kind === '(' ? '(' : n.kind === '[' ? '[' : '\\{';
         const close = n.kind === '(' ? ')' : n.kind === '[' ? ']' : '\\}';
         return res('\\left' + open + inner + '\\right' + close);

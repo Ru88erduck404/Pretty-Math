@@ -981,6 +981,8 @@ function makeRenderer(opts) {
         const tall = parts.some(function (p) { return p.tall; });
         const inner = parts.map(function (p) { return p.html; })
           .join('<span class="pm-punct">,</span><span class="pm-gap"></span>');
+        // A bare tuple -- `x, y = ...` -- carries no brackets of its own.
+        if (node.kind === ',') return box('pm-list', inner, node, 2, tall);
         const open = node.kind === '(' ? '(' : node.kind === '[' ? '[' : '{';
         const close = node.kind === '(' ? ')' : node.kind === '[' ? ']' : '}';
         return box('pm-list', fence(inner, open, close, tall), node, ATOM, tall);

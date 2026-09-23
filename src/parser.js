@@ -102,7 +102,20 @@ class Parser {
   }
 
   parseStatement() {
-    const left = this.parseExpr(0);
+    let left = this.parseExpr(0);
+
+    // `x, y = symbols("x y")` and `a, b = b, a + b`: a bare tuple, which only
+    // makes sense either side of an assignment.
+    if (this.atOp(',')) {
+      const items = [left];
+      while (this.eat(',')) {
+        if (this.peek().t === 'end') break;
+        items.push(this.parseExpr(0));
+      }
+      const last = items[items.length - 1];
+      left = this.node('List', { items: items, kind: ',' }, left.s, last.e);
+    }
+
     const t = this.peek();
     if (t.t === 'op' && ASSIGN_OPS.has(t.v)) {
       this.next();

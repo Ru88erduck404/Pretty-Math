@@ -50,12 +50,20 @@ function stripComments(c, flavor) {
         i++;
         continue;
       }
+      // The string's text is kept as written: the scanners that count brackets
+      // track quotes themselves, and blanking it would draw value("Bohr
+      // radius") as value("").
       const q = ch;
       keep(ch, i);
       i++;
       while (i < src.length && src[i] !== q) {
-        if (src[i] === '\\' && i + 1 < src.length) { keep(' ', i); i++; }
-        keep(src[i] === '\n' ? '\n' : ' ', i);
+        if (src[i] === '\\' && i + 1 < src.length) {
+          keep(src[i], i);
+          i++;
+          if (i < src.length) { keep(src[i], i); i++; }
+          continue;
+        }
+        keep(src[i], i);
         i++;
       }
       if (i < src.length) { keep(q, i); i++; }
@@ -192,6 +200,14 @@ function splitStatements(c) {
 }
 
 const LEAD_KEYWORDS = /^(return|yield|await|assert|elif|else\s+if|else|if|while|until|switch|case|when|do|throw|raise|print|echo|puts|let|const|var|final|static|public|private|protected|unsigned|signed)\b\s*/;
+
+// Statements that are not expressions at all. Drawing a red parse error over an
+// import line is noise: there was never any maths there to draw.
+const NOT_AN_EXPRESSION = /^\s*(import|from|export|package|using|include|#include|def|class|struct|enum|interface|impl|trait|fn|func|function|public\s+class|with|try|except|catch|finally|pass|break|continue|global|nonlocal|del|namespace|module|use|require)\b/;
+
+function isNoise(text) {
+  return NOT_AN_EXPRESSION.test(text);
+}
 const TYPE_DECL = /^[A-Za-z_][A-Za-z0-9_:<>\[\]*&.]*\s+([A-Za-z_][A-Za-z0-9_]*\s*(=|\+=|-=|\*=|\/=))/;
 
 // Removes the statement scaffolding around the expression: `return`, `if (...)`,
@@ -284,8 +300,9 @@ function statementsAt(text, sel, flavor, maxStatements, base) {
   const cleaned = stripComments(raw, flavor);
   const stmts = splitStatements(cleaned)
     .map(flatten)
+    .filter(function (s) { return !isNoise(s.text); })
     .map(stripScaffolding)
-    .filter(function (s) { return s.text.length > 0; });
+    .filter(function (s) { return s.text.length > 0 && !isNoise(s.text); });
   return {
     region: { start: region.start + at, end: region.end + at },
     statements: stmts.slice(0, maxStatements || 40)

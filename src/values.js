@@ -131,7 +131,36 @@ function valuesFromDebugger(raw, digits) {
   return out;
 }
 
+// Module aliases declared in the file. `import sympy as sp` and
+// `from scipy import constants as cn` make sp and cn qualifiers, so cn.R should
+// be drawn as R -- the same treatment np and math get by default, but learned
+// from the file rather than configured.
+const IMPORT_AS = /^\s*(?:from\s+[\w.]+\s+)?import\s+(.+)$/;
+
+function importAliases(text) {
+  const found = [];
+  String(text).split('\n').forEach(function (line) {
+    if (line.indexOf('import') === -1) return;
+    const m = IMPORT_AS.exec(line.split('#')[0]);
+    if (!m) return;
+    m[1].split(',').forEach(function (piece) {
+      const as = /^\s*([\w.]+)\s+as\s+([A-Za-z_]\w*)\s*$/.exec(piece);
+      if (as) {
+        if (found.indexOf(as[2]) === -1) found.push(as[2]);
+        return;
+      }
+      // `from scipy import constants` makes `constants` a qualifier too.
+      const plain = /^\s*([A-Za-z_]\w*)\s*$/.exec(piece);
+      if (plain && /^\s*from\s/.test(line) && found.indexOf(plain[1]) === -1) {
+        found.push(plain[1]);
+      }
+    });
+  });
+  return found;
+}
+
 module.exports = {
   collectValues: collectValues,
-  valuesFromDebugger: valuesFromDebugger
+  valuesFromDebugger: valuesFromDebugger,
+  importAliases: importAliases
 };

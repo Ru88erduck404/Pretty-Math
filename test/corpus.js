@@ -39,6 +39,10 @@ const RENDERS = [
   ['python', 'længde = np.sqrt(bredde**2 + højde**2)'],
   ['python', 'x = 0xDEADBEEF & 0b1010 | 0o777'],
   ['python', 'x = 1_000_000 * 2.5e-8'],
+  ['python', 'a, b = b, a + b'],
+  ['python', 'x, y = sp.symbols("x y")'],
+  ['python', 'eq1 = sp.Eq(1 + x, sp.sqrt(y**-3) * a0 * cn.R)'],
+  ['python', 'a0 = cn.value("Bohr radius")'],
   ['python', 'x = a\t*\tb'],
   ['python', 'x = ((((1))))'],
   ['python', 'dydx = sp.diff(y, x)'],
@@ -71,19 +75,25 @@ const RENDERS = [
 const REFUSES = [
   ['python', 'label = f"value is {x:.2f}"'],         // f-strings
   ['python', 'd = {"a": 1, "b": 2}'],                // dict literals
-  ['python', 'def area(r: float) -> float:'],        // signatures
-  ['python', 'a, b = b, a + b'],                     // tuple assignment
   ['python', 'if (n := len(values)) > 10:'],         // walrus inside parens
   ['python', 'x = '],                                // genuinely incomplete
   ['python', 'x = 1 +'],
   ['python', 'x = )bad(']
 ];
 
-// Neither drawn nor an error: there is simply nothing there.
+// Neither drawn nor an error: there is simply nothing there. Statements that
+// are not expressions belong here too -- an import line never held any maths,
+// so flagging it as a parse error would be noise.
 const EMPTY = [
   ['python', ''],
   ['python', '   '],
-  ['python', '# just a comment']
+  ['python', '# just a comment'],
+  ['python', 'import sympy as sp'],
+  ['python', 'from scipy import constants as cn'],
+  ['python', 'def area(r: float) -> float:'],
+  ['python', 'class Model:'],
+  ['javascript', 'export function f(a) {'],
+  ['cpp', '#include <cmath>']
 ];
 
 let pass = 0;

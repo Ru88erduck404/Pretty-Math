@@ -2,7 +2,7 @@
 
 const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
-const { collectValues, valuesFromDebugger } = require('./src/values');
+const { collectValues, valuesFromDebugger, importAliases } = require('./src/values');
 
 // How much text around the cursor is scanned. Big enough for any wrapped
 // formula, small enough that a huge file costs nothing per keystroke.
@@ -12,6 +12,8 @@ const MAX_SELECTION = 20000;
 const VALUE_LINES = 500;
 // A cap on how many variables one statement asks the debugger about.
 const MAX_LIVE_LOOKUPS = 40;
+// How long to wait for a debug adapter before giving up on live values.
+const LIVE_TIMEOUT_MS = 1500;
 
 function readConfig(doc) {
   const c = vscode.workspace.getConfiguration('prettyMath', doc ? doc.uri : null);
@@ -66,6 +68,9 @@ class PrettyMathView {
     this.last = null;          // { uri, statements, ... }
     this.timer = null;
     this.liveToken = 0;        // guards late debugger replies
+    this.liveKey = null;       // frame + names the cached answers belong to
+    this.liveAnswers = null;
+    this.livePending = null;   // a lookup already in flight for that key
     this.decoration = vscode.window.createTextEditorDecorationType({
       backgroundColor: new vscode.ThemeColor('editor.selectionHighlightBackground'),
       borderRadius: '2px'
@@ -187,6 +192,20 @@ class PrettyMathView {
     const cfg = readConfig(editor.document);
     const sel = editor.selection;
     const win = windowAround(editor.document, sel);
+
+    // Qualifiers the file itself declares, so `cn.R` reads as R after
+    // `from scipy import constants as cn`.
+    try {
+      const head = editor.document.getText(new vscode.Range(0, 0,
+        Math.min(editor.document.lineCount - 1, 200), 0));
+      const aliases = importAliases(head).filter(function (a) {
+        return cfg.stripNamespaces.indexOf(a) === -1;
+      });
+      if (aliases.length) cfg.stripNamespaces = cfg.stripNamespaces.concat(aliases);
+    } catch (err) {
+      // a file too short for the range, or anything else: not worth failing over
+    }
+
     let selStart = editor.document.offsetAt(sel.start) - win.base;
     let selEnd = editor.document.offsetAt(sel.end) - win.base;
     if (selEnd - selStart > MAX_SELECTION) selEnd = selStart + MAX_SELECTION;
@@ -256,31 +275,52 @@ class PrettyMathView {
     });
     if (!wanted.length) return;
 
+    // Asking the adapter the same question again on every cursor move floods a
+    // slow debug session for no new information. The answers only change when
+    // the frame does, so they are cached against it.
+    const key = frameId + '|' + wanted.join(',');
+    if (this.liveKey === key && this.liveAnswers) {
+      this.applyLiveValues(this.liveAnswers, fileValues, run, cfg);
+      return;
+    }
+    if (this.livePending === key) return;
+    this.livePending = key;
+
     const token = ++this.liveToken;
     const asked = {};
-    Promise.all(wanted.map(function (name) {
+    const lookups = Promise.all(wanted.map(function (name) {
       return Promise.resolve(
         session.customRequest('evaluate', { expression: name, frameId: frameId, context: 'watch' })
       ).then(function (reply) {
         if (reply && typeof reply.result === 'string') asked[name] = reply.result;
       }, function () { /* not in scope in this frame */ });
-    })).then(() => {
+    }));
+    // A debug adapter that never answers must not leave this hanging.
+    const timeout = new Promise(function (resolve) { setTimeout(resolve, LIVE_TIMEOUT_MS); });
+    Promise.race([lookups, timeout]).then(() => {
+      this.livePending = null;
       // The cursor may have moved on while the adapter was thinking.
       if (token !== this.liveToken || !this.view || !this.view.visible || this.pinned) return;
-      const live = valuesFromDebugger(asked, cfg.valueDigits);
-      if (!Object.keys(live).length) return;
-      let updated;
-      try {
-        updated = run(Object.assign({}, fileValues || {}, live));
-      } catch (err) {
-        return;
-      }
-      this.last = Object.assign({}, this.last, {
-        statements: updated.statements,
-        valueSource: 'debugger'
-      });
-      this.post(this.last);
-    }, function () { /* the session went away */ });
+      this.liveKey = key;
+      this.liveAnswers = asked;
+      this.applyLiveValues(asked, fileValues, run, cfg);
+    }, () => { this.livePending = null; });
+  }
+
+  applyLiveValues(asked, fileValues, run, cfg) {
+    const live = valuesFromDebugger(asked, cfg.valueDigits);
+    if (!Object.keys(live).length) return;
+    let updated;
+    try {
+      updated = run(Object.assign({}, fileValues || {}, live));
+    } catch (err) {
+      return;
+    }
+    this.last = Object.assign({}, this.last, {
+      statements: updated.statements,
+      valueSource: 'debugger'
+    });
+    this.post(this.last);
   }
 
   html(webview) {
@@ -348,7 +388,11 @@ function activate(context) {
   // While stepping, the values change under a stationary cursor.
   if (vscode.debug.onDidChangeActiveStackItem) {
     context.subscriptions.push(
-      vscode.debug.onDidChangeActiveStackItem(function () { provider.update(true); })
+      vscode.debug.onDidChangeActiveStackItem(function () {
+        provider.liveKey = null;      // a new frame means new answers
+        provider.liveAnswers = null;
+        provider.update(true);
+      })
     );
   }
   context.subscriptions.push(
