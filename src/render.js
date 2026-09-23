@@ -53,6 +53,7 @@ function defaults(opts) {
     derivativeSymbol: o.derivativeSymbol || 'auto',
     prec: o.prec || PREC,
     chains: o.chainsComparisons !== false,
+    values: o.values || null,
     strip: new Set(o.stripNamespaces || [])
   };
 }
@@ -62,6 +63,65 @@ function makeRenderer(opts) {
 
   function attrs(node) {
     return ' data-s="' + o.map(node.s) + '" data-e="' + o.map(node.e) + '"';
+  }
+
+  // A name being defined or bound here is not a name to substitute: in
+  // `E = 0.5*m*v**2` the E is the subject, and in `sum(x for x in xs)` the x
+  // belongs to the loop, whatever an `x` elsewhere in the file happens to hold.
+  let bound = 0;
+  function withoutValues(fn) {
+    bound++;
+    try {
+      return fn();
+    } finally {
+      bound--;
+    }
+  }
+
+  // Names bound by the expression itself -- a comprehension's loop variable, a
+  // lambda's parameter. These shadow anything of the same name in the file, for
+  // as long as we are inside the thing that binds them.
+  const boundNames = Object.create(null);
+  function identNames(node, into) {
+    if (!node || typeof node !== 'object') return into;
+    if (node.type === 'Ident') { into.push(node.name); return into; }
+    Object.keys(node).forEach(function (k) {
+      if (k === 'type' || k === 's' || k === 'e') return;
+      const child = node[k];
+      if (Array.isArray(child)) child.forEach(function (c) { identNames(c, into); });
+      else if (child && typeof child === 'object') identNames(child, into);
+    });
+    return into;
+  }
+  function withBound(names, fn) {
+    names.forEach(function (n) { boundNames[n] = (boundNames[n] || 0) + 1; });
+    try {
+      return fn();
+    } finally {
+      names.forEach(function (n) {
+        boundNames[n] -= 1;
+        if (!boundNames[n]) delete boundNames[n];
+      });
+    }
+  }
+
+  function valueOf(names) {
+    if (!o.values || bound > 0) return null;
+    for (let i = 0; i < names.length; i++) {
+      if (names[i] && boundNames[names[i]]) return null;
+    }
+    for (let i = 0; i < names.length; i++) {
+      const hit = names[i] && Object.prototype.hasOwnProperty.call(o.values, names[i])
+        ? o.values[names[i]] : null;
+      if (hit) return { name: names[i], value: hit };
+    }
+    return null;
+  }
+
+  function valueHtml(found) {
+    const live = found.value.live ? ' pm-value-live' : '';
+    return '<span class="pm-value' + live + '" title="' + esc(found.name) + ' = ' +
+      esc(found.value.text) + '">' + esc(found.value.text) + '</span>';
   }
 
   function box(cls, inner, node, prec, tall) {
@@ -269,9 +329,12 @@ function makeRenderer(opts) {
 
     const glyph = derivativeGlyph(specs);
     const order = totalOrder(specs);
-    const den = specs.map(function (s) {
-      return upright(glyph) + render(s.v).html + (s.order ? sup(render(s.order).html) : '');
-    }).join('<span class="pm-thin"></span>');
+    // d/dx is about the symbol x, never about whatever x currently holds.
+    const den = withoutValues(function () {
+      return specs.map(function (s) {
+        return upright(glyph) + render(s.v).html + (s.order ? sup(render(s.order).html) : '');
+      }).join('<span class="pm-thin"></span>');
+    });
 
     const target = render(expr);
     // df/dx when the target is a plain name or call, d/dx(...) when it is not.
@@ -320,9 +383,11 @@ function makeRenderer(opts) {
       const vars = intSpecs(rest);
       if (!vars.length || vars.some(function (v) { return !v.v || v.v.type === 'Num'; })) return null;
       signs = vars.map(function (v) { return limitColumn(v.from, v.to); });
-      differentials = vars.map(function (v) {
-        return '<span class="pm-gap"></span>' + upright('d') + render(v.v).html;
-      }).join('');
+      differentials = withoutValues(function () {
+        return vars.map(function (v) {
+          return '<span class="pm-gap"></span>' + upright('d') + render(v.v).html;
+        }).join('');
+      });
     }
 
     const glyphs = signs.map(function (limits) {
@@ -343,9 +408,10 @@ function makeRenderer(opts) {
     const vars = intSpecs(positional.slice(1)).filter(function (v) { return v.v; });
 
     const stacks = vars.map(function (v) {
+      const index = withoutValues(function () { return render(v.v).html; });
       const under = v.from
-        ? render(v.v).html + '<span class="pm-op pm-op-rel">=</span>' + render(v.from).html
-        : render(v.v).html;
+        ? index + '<span class="pm-op pm-op-rel">=</span>' + render(v.from).html
+        : index;
       return '<span class="pm-bigstack">' +
         '<span class="pm-lim-over">' + (v.to ? render(v.to).html : '') + '</span>' +
         '<span class="pm-bigop-glyph">' + esc(spec.glyph) + '</span>' +
@@ -364,8 +430,8 @@ function makeRenderer(opts) {
   function renderLimit(node, positional) {
     if (positional.length < 3) return null;
     const expr = positional[0];
-    let approach = render(positional[1]).html + '<span class="pm-op">→</span>' +
-      render(positional[2]).html;
+    let approach = withoutValues(function () { return render(positional[1]).html; }) +
+      '<span class="pm-op">→</span>' + render(positional[2]).html;
     if (positional[3] && positional[3].type === 'Str') {
       const side = positional[3].v.replace(/['"`]/g, '');
       if (side === '+' || side === '-') approach += sup(esc(side === '-' ? '−' : '+'));
@@ -377,12 +443,22 @@ function makeRenderer(opts) {
       '<span class="pm-thin"></span>' + body.html, node, MUL, true);
   }
 
+  function comprehensionNames(node) {
+    const out = [];
+    node.clauses.forEach(function (c) {
+      c.targets.forEach(function (t) { identNames(t, out); });
+    });
+    return out;
+  }
+
   // "x ∈ values, x > 0" — the bindings under a Σ, or after the bar in a
   // set-builder.
   function bindingsHtml(node) {
     return node.clauses.map(function (c) {
-      const targets = c.targets.map(function (t) { return render(t).html; })
-        .join('<span class="pm-punct">,</span>');
+      const targets = withoutValues(function () {
+        return c.targets.map(function (t) { return render(t).html; })
+          .join('<span class="pm-punct">,</span>');
+      });
       let out = targets + '<span class="pm-op pm-op-rel">∈</span>' + render(c.iter).html;
       c.conds.forEach(function (cond) {
         out += '<span class="pm-punct">,</span><span class="pm-gap"></span>' + render(cond).html;
@@ -399,6 +475,12 @@ function makeRenderer(opts) {
   function renderOverComprehension(node, name, comp) {
     const glyph = COMPREHENSION_OPS[name];
     if (!glyph) return null;
+    return withBound(comprehensionNames(comp), function () {
+      return bigOperatorHtml(node, glyph, comp);
+    });
+  }
+
+  function bigOperatorHtml(node, glyph, comp) {
     const wordy = glyph === 'max' || glyph === 'min';
     const body = operand(comp.body, MUL, 'right', '*');
     return box('pm-expr',
@@ -664,13 +746,28 @@ function makeRenderer(opts) {
     return n && n.type === 'Binary' && (n.op === '/' || n.op === '//') && !n.grouped;
   }
 
+  // A name that will be drawn as its value is a number on the page, whatever it
+  // is in the source -- otherwise `0.5 * m * v**2` with m = 3 and v = 12 comes
+  // out as "0.5 3 12²".
+  function asDrawn(leaf) {
+    if (!leaf) return leaf;
+    if (leaf.type === 'Ident' && valueOf([leaf.name])) return { type: 'Num', v: '0' };
+    if (leaf.type === 'Member') {
+      const found = valueOf([dottedName(leaf), resolveName(leaf)]);
+      if (found) return { type: 'Num', v: '0' };
+    }
+    return leaf;
+  }
+
   function needsDot(lNode, rNode) {
     if (o.multiplication === 'dot' || o.multiplication === 'cross') return true;
     // A factor next to a fraction is the one place a reader most needs to see
     // where the division stops, so it always gets an explicit dot.
     if (isFraction(lNode) || isFraction(rNode)) return true;
-    const left = edgeLeaf(lNode, 'right');
-    const right = edgeLeaf(rNode, 'left');
+    const left = asDrawn(edgeLeaf(lNode, 'right'));
+    const right = asDrawn(edgeLeaf(rNode, 'left'));
+    // Two numbers side by side would merge into one.
+    if (left && right && left.type === 'Num' && right.type === 'Num') return true;
     if (right && (right.type === 'Num' || right.type === 'Unary')) return true;
     if (multiLetter(left) && multiLetter(right)) return true;
     // t*t would otherwise print as "t t" and read like one doubled symbol.
@@ -740,11 +837,16 @@ function makeRenderer(opts) {
       case 'Str':
         return box('pm-str', '<span class="pm-string">' + esc(node.v) + '</span>', node, ATOM, false);
 
-      case 'Ident':
+      case 'Ident': {
+        const found = valueOf([node.name]);
+        if (found) return box('pm-ident', valueHtml(found), node, ATOM, false);
         return box('pm-ident', identHtml(node.name), node, ATOM, false);
+      }
 
       case 'Member': {
         const name = resolveName(node);
+        const found = valueOf([dottedName(node), name]);
+        if (found) return box('pm-ident', valueHtml(found), node, ATOM, false);
         if (name !== null && name.indexOf('.') === -1) {
           return box('pm-ident', identHtml(name), node, ATOM, false);
         }
@@ -778,16 +880,21 @@ function makeRenderer(opts) {
       }
 
       case 'Comprehension': {
-        const body = render(node.body);
-        return box('pm-comp',
-          body.html + '<span class="pm-op pm-op-bin">∣</span>' + bindingsHtml(node),
-          node, ADD, body.tall);
+        return withBound(comprehensionNames(node), function () {
+          const body = render(node.body);
+          return box('pm-comp',
+            body.html + '<span class="pm-op pm-op-bin">∣</span>' + bindingsHtml(node),
+            node, ADD, body.tall);
+        });
       }
 
       case 'Lambda': {
-        const params = node.params.map(function (p) { return render(p).html; })
-          .join('<span class="pm-punct">,</span><span class="pm-gap"></span>');
-        const body = render(node.body);
+        const paramNames = identNames({ list: node.params }, []);
+        const params = withoutValues(function () {
+          return node.params.map(function (p) { return render(p).html; })
+            .join('<span class="pm-punct">,</span><span class="pm-gap"></span>');
+        });
+        const body = withBound(paramNames, function () { return render(node.body); });
         return box('pm-expr',
           params + '<span class="pm-op pm-op-rel">↦</span>' + body.html, node, 2, body.tall);
       }
@@ -855,7 +962,7 @@ function makeRenderer(opts) {
       }
 
       case 'Assign': {
-        const l = render(node.l);
+        const l = withoutValues(function () { return render(node.l); });
         const r = render(node.r);
         const glyph = node.op === '=' || node.op === ':=' ? '=' : node.op;
         return box('pm-assign',

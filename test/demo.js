@@ -73,17 +73,33 @@ const SAMPLES = [
   ['python', 'g = lambda x: 1 / (1 + math.exp(-x))'],
   ['java', 'double avg = (double) sum / count;'],
   ['rust', 'let ratio = (hits as f64) / (total as f64);'],
-  ['javascript', 'const scale = (x) => x * 2 / (1 + x);']
+  ['javascript', 'const scale = (x) => x * 2 / (1 + x);'],
+
+  // The last argument is a file the values are read from.
+  ['python', 'E = 0.5 * m * v**2'],
+  ['python', 'E = 0.5 * m * v**2', 'm = 3.0\nv = 12\n'],
+  ['python', 'f = G * m1 * m2 / r**2',
+    'G = 6.674e-11\nm1 = 5.972e24\nm2 = 7.35e22\nr = 384400e3\n'],
+  ['python', 'dt = 1 / rate', 'rate = 44100\n'],
+  ['python', 'p = n * R * T / V', 'n = 2\nR = 8.314\nT = 293.15\nV = 0.05\n'],
+  ['python', 's = sum(x for x in data)', 'x = 99\ndata = 3\n']
 ];
 
 const FROM = Number(process.argv[2] || 0);
 const TO = Number(process.argv[3] || SAMPLES.length);
 const OUT = process.argv[4] || 'demo.html';
 
+// A sample may carry a third element: source to read variable values from, so
+// the substitution mode can be eyeballed too.
+const { collectValues } = require('../src/values');
+
 const rows = SAMPLES.slice(FROM, TO).map(function (pair) {
   const lang = pair[0];
   const src = pair[1];
-  const out = analyze(src, { start: 0, end: 0 }, lang, CFG);
+  const cfg = pair[2]
+    ? Object.assign({}, CFG, { values: collectValues(pair[2], lang, CFG) })
+    : CFG;
+  const out = analyze(src, { start: 0, end: 0 }, lang, cfg);
   const st = out.statements[0] || { html: '', source: src, latex: '', error: null };
   st.lang = lang;
   st.original = src;

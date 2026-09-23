@@ -81,6 +81,89 @@ check('index subscript', tex('a[i] * b[i + 1]'), 'a_{i} \\cdot b_{i + 1}');
 check('ternary cases', tex('x if x > 0 else -x'), /begin\{cases\}/);
 check('scientific notation', tex('1.5e-3 * x'), '1.5 \\times 10^{-3} \\cdot x');
 
+// ---- substituting variable values -----------------------------------------
+const { collectValues, valuesFromDebugger } = require('../src/values');
+const { evaluate, formatNumber } = require('../src/evaluate');
+
+function withValues(src, file, lang) {
+  const cfg = Object.assign({}, CFG, {
+    substituteValues: true,
+    values: collectValues(file, lang || 'python', CFG)
+  });
+  const r = analyze(src, { start: 0, end: 0 }, lang || 'python', cfg);
+  return r.statements[0];
+}
+
+function plainText(html) {
+  return html.replace(/<[^>]*>/g, '');
+}
+
+const FILE = [
+  'm = 3.0',
+  'v = 12',
+  'g = 9.81',
+  'n = 60 * 60',
+  'half = 1 / 2',
+  'r = math.sqrt(16)',
+  'self.mass = 2.5',
+  'unknown = some_call(1)',
+  'later = 5',
+  'later = other',
+  ''
+].join('\n');
+
+const vals = collectValues(FILE, 'python', CFG);
+check('literal value read', vals.m.text, '3');
+check('integer value read', vals.v.text, '12');
+check('arithmetic folded', vals.n.text, '3600');
+check('division folded', vals.half.text, '0.5');
+check('known function folded', vals.r.text, '4');
+check('qualifier stripped name recorded', vals.mass.text, '2.5');
+check('unknown right-hand side ignored', vals.unknown, undefined);
+check('reassignment to something unknown forgets the value', vals.later, undefined);
+
+// Numbers that end up side by side must be separated, or 0.5 · 3 · 12² would be
+// drawn as "0.5 3 12".
+check('values are plugged in',
+  plainText(withValues('e = 0.5 * m * v**2', FILE).html), 'e=0.5·3·122');
+check('the assigned name keeps its name',
+  /pm-value/.test(withValues('e = 0.5 * m * v**2', FILE).html.split('pm-op-rel')[0]), false);
+check('substitution is marked as such',
+  /class="pm-value"/.test(withValues('x = g * 2', FILE).html), true);
+check('unknown names stay as names',
+  plainText(withValues('y = m * unknown', FILE).html), 'y=3unknown');
+
+// A name bound by the expression itself must never take a value from the file.
+check('loop variables are not substituted',
+  plainText(withValues('s = sum(v for v in data)', FILE).html), 's=∑v∈datav');
+check('lambda parameters are not substituted',
+  plainText(withValues('f = lambda v: v + 1', FILE).html), 'f=v↦v+1');
+check('differentiation variables are not substituted',
+  plainText(withValues('d = sp.diff(y, v)', FILE).html).indexOf('12'), -1);
+
+check('off by default',
+  /pm-value/.test(analyze('e = 0.5 * m * v**2', { start: 0, end: 0 }, 'python', CFG).statements[0].html),
+  false);
+
+check('names are reported for the debugger',
+  analyze('e = 0.5 * m * v**2', { start: 0, end: 0 }, 'python', CFG).statements[0].names.join(','),
+  'm,v');
+check('bound names are not asked about',
+  analyze('s = sum(q for q in data)', { start: 0, end: 0 }, 'python', CFG).statements[0].names.join(','),
+  'data');
+
+const live = valuesFromDebugger({ a: '2.5', b: 'array([1, 2, 3])', c: '7', d: 'None', e: '<object at 0x1>' }, 6);
+check('numeric debugger values accepted', live.a.text + ',' + live.c.text, '2.5,7');
+check('non-numeric debugger values skipped',
+  [live.b, live.d, live.e].filter(Boolean).length, 0);
+check('debugger values are marked live', live.a.live, true);
+
+check('nothing is executed: unknown calls stay unknown',
+  evaluate({ type: 'Call', callee: { type: 'Ident', name: 'input' }, args: [] }, {}, new Set()), null);
+check('formatting trims noise', formatNumber(0.1 + 0.2, 6), '0.3');
+check('formatting keeps integers whole', formatNumber(3600, 6), '3600');
+check('formatting uses exponent for the very small', formatNumber(0.0000123, 6), '1.23e-5');
+
 // ---- comprehensions, lambdas and casts ------------------------------------
 check('sum over a comprehension', tex('total = sum(x**2 for x in values)'),
   '\\mathrm{total} = \\sum_{x \\in \\mathrm{values}} x^{2}');

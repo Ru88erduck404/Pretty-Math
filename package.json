@@ -2,7 +2,7 @@
   "name": "pretty-math",
   "displayName": "Pretty Math",
   "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "ru88erduck404",
   "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
   "license": "MIT",
@@ -28,7 +28,8 @@
     "commands": [
       { "command": "prettyMath.show", "title": "Show Panel", "category": "Pretty Math" },
       { "command": "prettyMath.pin", "title": "Pin / Unpin Current Expression", "category": "Pretty Math" },
-      { "command": "prettyMath.copyLatex", "title": "Copy Current Expression as LaTeX", "category": "Pretty Math" }
+      { "command": "prettyMath.copyLatex", "title": "Copy Current Expression as LaTeX", "category": "Pretty Math" },
+      { "command": "prettyMath.toggleValues", "title": "Toggle Variable Values", "category": "Pretty Math" }
     ],
     "keybindings": [
       { "command": "prettyMath.show", "key": "ctrl+alt+m", "mac": "cmd+alt+m" }
@@ -91,6 +92,18 @@
           "items": { "type": "string" },
           "default": ["Math", "math", "np", "numpy", "cmath", "scipy", "torch", "jnp", "sp", "sym", "sympy", "smp", "std", "self", "this"],
           "markdownDescription": "Qualifiers dropped before rendering, so `np.sqrt(x)` reads as a plain root and `self.mass` as `mass`."
+        },
+        "prettyMath.substituteValues": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Draw what the variables are worth in place of their names. Values come from a paused debug session when there is one, otherwise from assignments above the cursor, which are read but never executed. Toggled by the **Values** button in the panel."
+        },
+        "prettyMath.valueDigits": {
+          "type": "number",
+          "default": 6,
+          "minimum": 1,
+          "maximum": 17,
+          "description": "Significant digits used when a substituted value is not a whole number."
         },
         "prettyMath.showLatex": {
           "type": "boolean",

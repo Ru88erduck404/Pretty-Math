@@ -2,11 +2,16 @@
 
 const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
+const { collectValues, valuesFromDebugger } = require('./src/values');
 
 // How much text around the cursor is scanned. Big enough for any wrapped
 // formula, small enough that a huge file costs nothing per keystroke.
 const WINDOW_LINES = 80;
 const MAX_SELECTION = 20000;
+// How far back to look for what the variables hold.
+const VALUE_LINES = 500;
+// A cap on how many variables one statement asks the debugger about.
+const MAX_LIVE_LOOKUPS = 40;
 
 function readConfig(doc) {
   const c = vscode.workspace.getConfiguration('prettyMath', doc ? doc.uri : null);
@@ -22,8 +27,27 @@ function readConfig(doc) {
     stripNamespaces: c.get('stripNamespaces', []),
     showLatex: c.get('showLatex', false),
     showTree: c.get('showTree', false),
-    maxLines: c.get('maxLines', 40)
+    maxLines: c.get('maxLines', 40),
+    substituteValues: c.get('substituteValues', false),
+    valueDigits: c.get('valueDigits', 6),
+    valueScanLines: VALUE_LINES
   };
+}
+
+// The text above the cursor that assignments are read from.
+function valueWindow(doc, selection) {
+  const first = Math.max(0, selection.start.line - VALUE_LINES);
+  const range = new vscode.Range(first, 0, selection.start.line,
+    doc.lineAt(selection.start.line).text.length);
+  return doc.getText(range);
+}
+
+// The frame a paused debug session is stopped in, when the running VS Code is
+// new enough to expose it. Without it there is nothing to evaluate against.
+function pausedFrameId() {
+  const item = vscode.debug.activeStackItem;
+  if (!item || typeof item.frameId !== 'number') return null;
+  return item.frameId;
 }
 
 // The slice of the document we hand to the parser, plus its offset in the file.
@@ -41,6 +65,7 @@ class PrettyMathView {
     this.pinned = false;
     this.last = null;          // { uri, statements, ... }
     this.timer = null;
+    this.liveToken = 0;        // guards late debugger replies
     this.decoration = vscode.window.createTextEditorDecorationType({
       backgroundColor: new vscode.ThemeColor('editor.selectionHighlightBackground'),
       borderRadius: '2px'
@@ -166,15 +191,33 @@ class PrettyMathView {
     let selEnd = editor.document.offsetAt(sel.end) - win.base;
     if (selEnd - selStart > MAX_SELECTION) selEnd = selStart + MAX_SELECTION;
 
+    // Values read from assignments above the cursor. Cheap, so it happens up
+    // front; the debugger's values, if any, arrive afterwards and win.
+    let values = null;
+    if (cfg.substituteValues) {
+      try {
+        values = collectValues(valueWindow(editor.document, sel),
+          editor.document.languageId, cfg);
+      } catch (err) {
+        values = null;
+      }
+    }
+
+    const run = (vals) => {
+      return analyze(win.text, { start: selStart, end: selEnd },
+        editor.document.languageId,
+        Object.assign({}, cfg, { base: win.base, values: vals }));
+    };
+
     let payload;
     try {
-      payload = analyze(win.text, { start: selStart, end: selEnd },
-        editor.document.languageId, Object.assign({}, cfg, { base: win.base }));
+      payload = run(values);
     } catch (err) {
       this.post({ type: 'empty', reason: 'Pretty Math could not read this text: ' + err.message });
       return;
     }
 
+    const debugging = cfg.substituteValues && !!vscode.debug.activeDebugSession;
     this.last = {
       type: 'render',
       uri: editor.document.uri.toString(),
@@ -186,9 +229,58 @@ class PrettyMathView {
       fontSize: cfg.fontSize,
       showLatex: cfg.showLatex,
       showTree: cfg.showTree,
+      substituting: cfg.substituteValues,
+      valueSource: cfg.substituteValues
+        ? (debugging ? 'debugger' : (values && Object.keys(values).length ? 'file' : 'none'))
+        : null,
       pinned: this.pinned
     };
     this.post(this.last);
+
+    if (debugging) this.enrichFromDebugger(payload, values, run, cfg);
+  }
+
+  // Asks a paused debug session what the names in this statement are worth, and
+  // redraws with those values. Runs after the first paint, so the panel never
+  // waits on the debug adapter.
+  enrichFromDebugger(payload, fileValues, run, cfg) {
+    const frameId = pausedFrameId();
+    const session = vscode.debug.activeDebugSession;
+    if (frameId === null || !session) return;
+
+    const wanted = [];
+    payload.statements.forEach(function (st) {
+      (st.names || []).forEach(function (n) {
+        if (wanted.indexOf(n) === -1 && wanted.length < MAX_LIVE_LOOKUPS) wanted.push(n);
+      });
+    });
+    if (!wanted.length) return;
+
+    const token = ++this.liveToken;
+    const asked = {};
+    Promise.all(wanted.map(function (name) {
+      return Promise.resolve(
+        session.customRequest('evaluate', { expression: name, frameId: frameId, context: 'watch' })
+      ).then(function (reply) {
+        if (reply && typeof reply.result === 'string') asked[name] = reply.result;
+      }, function () { /* not in scope in this frame */ });
+    })).then(() => {
+      // The cursor may have moved on while the adapter was thinking.
+      if (token !== this.liveToken || !this.view || !this.view.visible || this.pinned) return;
+      const live = valuesFromDebugger(asked, cfg.valueDigits);
+      if (!Object.keys(live).length) return;
+      let updated;
+      try {
+        updated = run(Object.assign({}, fileValues || {}, live));
+      } catch (err) {
+        return;
+      }
+      this.last = Object.assign({}, this.last, {
+        statements: updated.statements,
+        valueSource: 'debugger'
+      });
+      this.post(this.last);
+    }, function () { /* the session went away */ });
   }
 
   html(webview) {
@@ -210,6 +302,7 @@ class PrettyMathView {
       '<span class="spacer"></span>' +
       '<button id="smaller" title="Smaller">A-</button>' +
       '<button id="bigger" title="Bigger">A+</button>' +
+      '<button id="values" title="Plug in what the variables are worth, from the file or from a paused debug session">Values</button>' +
       '<button id="showtex" title="Show the LaTeX under each expression">LaTeX</button>' +
       '<button id="tex" title="Copy this expression as LaTeX">Copy</button>' +
       '<button id="pin" title="Freeze the panel on this expression">Pin</button>' +
@@ -244,7 +337,23 @@ function activate(context) {
     }),
     vscode.commands.registerCommand('prettyMath.copyLatex', function () {
       provider.copyLatex();
+    }),
+    vscode.commands.registerCommand('prettyMath.toggleValues', function () {
+      const c = vscode.workspace.getConfiguration('prettyMath');
+      return c.update('substituteValues', !c.get('substituteValues', false),
+        vscode.ConfigurationTarget.Global);
     })
+  );
+
+  // While stepping, the values change under a stationary cursor.
+  if (vscode.debug.onDidChangeActiveStackItem) {
+    context.subscriptions.push(
+      vscode.debug.onDidChangeActiveStackItem(function () { provider.update(true); })
+    );
+  }
+  context.subscriptions.push(
+    vscode.debug.onDidTerminateDebugSession(function () { provider.update(true); }),
+    vscode.debug.onDidStartDebugSession(function () { provider.update(true); })
   );
 }
 

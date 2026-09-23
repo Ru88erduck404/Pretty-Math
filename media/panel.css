@@ -338,3 +338,13 @@ body {
   padding: 0 0 0 .3em;
   vertical-align: 0;
 }
+
+/* A substituted value: green so it reads as data rather than as a literal
+   that was written in the source (those stay blue). */
+.pm-value {
+  font-style: normal;
+  color: var(--vscode-charts-green, #89d185);
+}
+.pm-value-live {
+  border-bottom: 1px dotted var(--vscode-charts-green, #89d185);
+}

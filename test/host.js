@@ -100,6 +100,13 @@ const vscodeStub = {
     onDidChangeTextDocument: eventStub('change'),
     onDidChangeConfiguration: eventStub('config')
   },
+  debug: {
+    activeDebugSession: null,
+    activeStackItem: undefined,
+    onDidChangeActiveStackItem: eventStub('stackItem'),
+    onDidStartDebugSession: eventStub('debugStart'),
+    onDidTerminateDebugSession: eventStub('debugEnd')
+  },
   window: {
     get activeTextEditor() { return editor; },
     visibleTextEditors: [editor],
@@ -206,6 +213,62 @@ check('reveal moves the selection',
 view.webview._onMessage({ type: 'copyLatex' });
 check('latex copied', clipboard, '\\mathrm{speed} = \\frac{\\mathrm{distance}}{t_{\\mathrm{end}} - t_{\\mathrm{start}}}');
 
+// ---- variable values -------------------------------------------------------
+
+// Off by default: no value is drawn even though the file defines one.
+const valueDoc = 'mass = 4\nspeed = 3\nenergy = mass * speed\ntail = 1\n';
+editor.document = makeDocument(valueDoc, 'python');
+editor.selection = new Selection(new Position(2, 2), new Position(2, 2));
+captured.update(true);
+let shown = posted.filter(function (m) { return m.type === 'render'; }).pop();
+check('values off by default', /pm-value/.test(shown.statements[0].html), false);
+check('button state reported as off', shown.substituting, false);
+
+// The button toggles the setting, which is what the extension reads.
+DEFAULTS.substituteValues = true;
+captured.update(true);
+shown = posted.filter(function (m) { return m.type === 'render'; }).pop();
+check('values drawn once switched on', /class="pm-value"/.test(shown.statements[0].html), true);
+check('the file is named as the source', shown.valueSource, 'file');
+check('both variables substituted',
+  (shown.statements[0].html.match(/class="pm-value"/g) || []).length, 2);
+
+// A paused debug session overrides the file, and marks the values as live.
+let evaluated = [];
+vscodeStub.debug.activeDebugSession = {
+  customRequest: function (kind, args) {
+    evaluated.push(args.expression);
+    if (kind !== 'evaluate') return Promise.reject(new Error('unsupported'));
+    if (args.frameId !== 7) return Promise.reject(new Error('wrong frame'));
+    const live = { mass: '10.5', speed: 'array([1, 2])' };
+    return Object.prototype.hasOwnProperty.call(live, args.expression)
+      ? Promise.resolve({ result: live[args.expression] })
+      : Promise.reject(new Error('not in scope'));
+  }
+};
+vscodeStub.debug.activeStackItem = { frameId: 7, threadId: 1 };
+captured.update(true);
+
+setTimeout(function () {
+  const afterDebug = posted.filter(function (m) { return m.type === 'render'; }).pop();
+  check('the debugger is asked about the names read',
+    evaluated.sort().join(','), 'mass,speed');
+  check('live values are used', /10\.5/.test(afterDebug.statements[0].html), true);
+  check('live values are marked', /pm-value-live/.test(afterDebug.statements[0].html), true);
+  check('the debugger is named as the source', afterDebug.valueSource, 'debugger');
+  check('a non-numeric live value falls back to the file value',
+    /class="pm-value"[^>]*>3</.test(afterDebug.statements[0].html), true);
+
+  vscodeStub.debug.activeDebugSession = null;
+  vscodeStub.debug.activeStackItem = undefined;
+  DEFAULTS.substituteValues = false;
+  editor.document = makeDocument(code, 'python');
+  editor.selection = new Selection(new Position(line, 4), new Position(line, 4));
+  rest();
+}, 150);
+
+function rest() {
+
 // Pin freezes updates.
 view.webview._onMessage({ type: 'pin' });
 const before = posted.length;
@@ -226,3 +289,5 @@ setTimeout(function () {
     process.exit(fail ? 1 : 0);
   }, 200);
 }, 200);
+
+}

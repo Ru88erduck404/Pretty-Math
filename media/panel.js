@@ -185,6 +185,24 @@
     const texButton = document.getElementById('showtex');
     if (texButton) texButton.classList.toggle('on', !!msg.showLatex);
 
+    const valButton = document.getElementById('values');
+    if (valButton) {
+      valButton.classList.toggle('on', !!msg.substituting);
+      // Say where the numbers came from: live ones are worth trusting, the
+      // ones read from the file are a guess about what the code will do.
+      valButton.textContent = !msg.substituting ? 'Values'
+        : msg.valueSource === 'debugger' ? 'Values · live'
+        : msg.valueSource === 'file' ? 'Values · file'
+        : 'Values · none';
+      valButton.title = !msg.substituting
+        ? 'Plug in what the variables are worth'
+        : msg.valueSource === 'debugger'
+          ? 'Values from the paused debug session'
+          : msg.valueSource === 'file'
+            ? 'Values read from assignments above the cursor, not from a running program'
+            : 'No value could be worked out for any variable here';
+    }
+
     content.textContent = '';
     if (!msg.statements || !msg.statements.length) {
       const p = document.createElement('p');
@@ -232,6 +250,12 @@
     showTex.addEventListener('click', function () {
       const next = !(state && state.showLatex);
       post({ type: 'setConfig', key: 'showLatex', value: next });
+    });
+  }
+  const valuesButton = document.getElementById('values');
+  if (valuesButton) {
+    valuesButton.addEventListener('click', function () {
+      post({ type: 'setConfig', key: 'substituteValues', value: !(state && state.substituting) });
     });
   }
   document.getElementById('bigger').addEventListener('click', function () {

@@ -40,6 +40,8 @@ classic precedence slip is visible instead of inferred.
 - **Hover** a piece of the drawing to highlight where it came from in the editor;
   **click** it to select that range. The sub-expression your cursor sits in is
   outlined in the panel.
+- **Values** swaps variable names for what they are worth; press it again to go
+  back to the symbols. See *Plugging in the values* below.
 - **Pin** freezes the panel on the current expression while you edit elsewhere.
 - **Copy LaTeX** puts the same expression on the clipboard as LaTeX.
 
@@ -104,6 +106,44 @@ anything from a NumPy-family namespace is read as a difference. `Derivative`,
 `Integral`, `Sum`, `Product` and `Limit` — the unevaluated classes — render the
 same as their lowercase functions.
 
+## Plugging in the values
+
+The **Values** button in the panel toolbar swaps variable names for what they
+are worth, so `0.5 * m * v**2` reads as `0.5 · 3 · 12²`. Press it again to go
+back to the symbols. It is off until you turn it on, and the state is the
+`prettyMath.substituteValues` setting, so it persists; *Pretty Math: Toggle
+Variable Values* does the same from the command palette.
+
+The numbers come from one of two places, and the button says which:
+
+- **Values · live** — a debug session is paused, and each name was evaluated in
+  the frame you are stopped in. These are the real values, and they are drawn
+  with a dotted underline. Stepping redraws them.
+- **Values · file** — no debugger, so assignments above the cursor were read
+  instead. **Nothing is executed**: each right-hand side is parsed and folded by
+  a closed evaluator that knows arithmetic and the usual maths functions and
+  nothing else. `n = 60 * 60` gives 3600; `n = fetch()` gives nothing.
+
+Read values are a static guess: the last assignment before the cursor wins,
+whether or not the code would have taken that branch. Live values have no such
+problem, which is why they win when both exist.
+
+Some things are deliberately never substituted:
+
+- the name being assigned, so `E = 0.5*m*v**2` keeps its `E`;
+- names the expression binds itself — a comprehension's loop variable, a
+  lambda's parameter — since those shadow anything of the same name in the file;
+- the variable of a derivative or an integral, which is a symbol, not a value;
+- anything that is not a number. An array or an object would wreck the layout
+  and tell you nothing at a glance, so the name stays.
+
+Substituted numbers are drawn in green, so they never read as literals that were
+written in the source — those stay blue. Hovering one shows the name it replaced.
+
+**Copy LaTeX always copies the formula, with the names**, whether or not values
+are showing. Values are for checking magnitudes on the spot; the algebra is what
+you want in a document.
+
 ## Settings
 
 | Setting | Default | |
@@ -117,6 +157,8 @@ same as their lowercase functions.
 | `prettyMath.expandIdentities` | `true` | `exp`, `hypot`, `log1p`, `expm1` |
 | `prettyMath.derivativeSymbol` | `auto` | `auto`, `d`, or `partial` |
 | `prettyMath.stripNamespaces` | `Math, math, np, sp, sympy, self, …` | qualifiers to drop |
+| `prettyMath.substituteValues` | `false` | the Values button; draw what variables are worth |
+| `prettyMath.valueDigits` | `6` | significant digits for a substituted value |
 | `prettyMath.showLatex` | `false` | LaTeX under the drawing |
 | `prettyMath.showTree` | `false` | parse tree under the drawing |
 | `prettyMath.maxLines` | `40` | statements drawn from one selection |

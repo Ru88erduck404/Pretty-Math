@@ -4,6 +4,28 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.3] — 2026-09-23
+
+### Added
+
+- A **Values** button that draws what the variables are worth in place of their
+  names, and turns it off again. Off by default; the state lives in
+  `prettyMath.substituteValues`, and *Pretty Math: Toggle Variable Values* does
+  the same from the command palette.
+- Values come from a paused debug session when there is one — evaluated in the
+  frame you are stopped in, redrawn as you step, and marked with a dotted
+  underline — and otherwise from assignments above the cursor. Those are parsed
+  and constant-folded by a closed evaluator; no code from the file is ever run.
+- Names that are being assigned, bound by a comprehension or a lambda, or that
+  are the variable of a derivative or integral are left as names, since a value
+  would be wrong or meaningless there. Non-numeric values are left alone too.
+
+### Fixed
+
+- A substituted value is treated as a number when spacing a product, so
+  `0.5 * m * v**2` with m = 3 and v = 12 is drawn as `0.5 · 3 · 12²` rather than
+  running the three numbers together.
+
 ## [0.1.2] — 2026-09-08
 
 ### Added
