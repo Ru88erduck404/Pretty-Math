@@ -2,7 +2,7 @@
   "name": "pretty-math",
   "displayName": "Pretty Math",
   "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "publisher": "ru88erduck404",
   "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
   "license": "MIT",
@@ -97,6 +97,11 @@
           "type": "boolean",
           "default": false,
           "markdownDescription": "Draw what the variables are worth in place of their names. Values come from a paused debug session when there is one, otherwise from assignments above the cursor, which are read but never executed. Toggled by the **Values** button in the panel."
+        },
+        "prettyMath.jupyterValues": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "In a notebook, ask the running kernel what the variables hold, the way the Variables view does. Only applies while **Values** is on, and only where a kernel is already idle. Requires the Jupyter extension; without it, values still come from the cells above."
         },
         "prettyMath.valueDigits": {
           "type": "number",

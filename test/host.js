@@ -33,7 +33,7 @@ function Range(a, b, c, d) {
 }
 function Selection(start, end) { Range.call(this, start, end); this.active = end; }
 
-function makeDocument(text, languageId) {
+function makeDocument(text, languageId, scheme) {
   const lines = text.split('\n');
   const starts = [];
   let at = 0;
@@ -42,7 +42,10 @@ function makeDocument(text, languageId) {
     languageId: languageId,
     lineCount: lines.length,
     fileName: 'C:/tmp/sample.' + (languageId === 'python' ? 'py' : 'js'),
-    uri: { toString: function () { return 'file:///tmp/sample'; } },
+    uri: {
+      scheme: scheme || 'file',
+      toString: function () { return (scheme || 'file') + ':///tmp/sample/' + lines.length + '/' + text.length; }
+    },
     lineAt: function (n) { return { text: lines[n] }; },
     offsetAt: function (p) { return starts[p.line] + p.character; },
     positionAt: function (o) {
@@ -66,6 +69,7 @@ function eventStub(name) {
 const decorations = [];
 const posted = [];
 let clipboard = '';
+const extensionStubs = {};
 
 const editor = {
   document: null,
@@ -98,7 +102,9 @@ const vscodeStub = {
       };
     },
     onDidChangeTextDocument: eventStub('change'),
-    onDidChangeConfiguration: eventStub('config')
+    onDidChangeConfiguration: eventStub('config'),
+    onDidChangeNotebookDocument: eventStub('notebookChange'),
+    notebookDocuments: []
   },
   debug: {
     activeDebugSession: null,
@@ -106,6 +112,14 @@ const vscodeStub = {
     onDidChangeActiveStackItem: eventStub('stackItem'),
     onDidStartDebugSession: eventStub('debugStart'),
     onDidTerminateDebugSession: eventStub('debugEnd')
+  },
+  extensions: {
+    getExtension: function (id) { return extensionStubs[id] || undefined; }
+  },
+  NotebookCellKind: { Markup: 1, Code: 2 },
+  CancellationTokenSource: function () {
+    this.token = { isCancellationRequested: false };
+    this.cancel = function () { this.token.isCancellationRequested = true; };
   },
   window: {
     get activeTextEditor() { return editor; },
@@ -269,6 +283,107 @@ setTimeout(function () {
 
 function rest() {
 
+// ---- notebooks -------------------------------------------------------------
+
+// Variables live in earlier cells, which are separate documents. Reading only
+// the current cell would find nothing.
+const cell1 = makeDocument('import numpy as np\nT = 300\n', 'python', 'vscode-notebook-cell');
+const cell2 = makeDocument('k_B = 1.380649e-23\n', 'python', 'vscode-notebook-cell');
+const cell3 = makeDocument('E = k_B * T\n', 'python', 'vscode-notebook-cell');
+const notebook = {
+  uri: { toString: function () { return 'file:///tmp/book.ipynb'; } },
+  getCells: function () {
+    return [
+      { index: 0, kind: 2, document: cell1 },
+      { index: 1, kind: 2, document: cell2 },
+      { index: 2, kind: 2, document: cell3 }
+    ];
+  }
+};
+vscodeStub.workspace.notebookDocuments = [notebook];
+
+DEFAULTS.substituteValues = true;
+DEFAULTS.jupyterValues = false;
+editor.document = cell3;
+editor.selection = new Selection(new Position(0, 3), new Position(0, 3));
+captured.update(true);
+let nb = posted.filter(function (m) { return m.type === 'render'; }).pop();
+check('a notebook cell reads the cells above it', nb.valueSource, 'file');
+check('a value from an earlier cell is used',
+  /1\.38\d*e-23/.test(nb.statements[0].html), true);
+check('and one from the cell before that too', /300/.test(nb.statements[0].html), true);
+
+// Losing the active editor must not wipe the panel: clicking the button moves
+// focus, and with a notebook that can clear activeTextEditor.
+const realEditor = editor.document;
+let savedEditor = vscodeStub.window.activeTextEditor;
+Object.defineProperty(vscodeStub.window, 'activeTextEditor', {
+  configurable: true, get: function () { return undefined; }
+});
+vscodeStub.window.visibleTextEditors = [editor];
+const beforeBlur = posted.length;
+captured.update(true);
+const afterBlur = posted.slice(beforeBlur);
+check('no editor focused does not clear the panel',
+  afterBlur.some(function (m) { return m.type === 'empty'; }), false);
+check('it redraws from the remembered editor',
+  afterBlur.filter(function (m) { return m.type === 'render'; }).length > 0, true);
+Object.defineProperty(vscodeStub.window, 'activeTextEditor', {
+  configurable: true, get: function () { return editor; }
+});
+
+// With a kernel, the values come from it instead.
+let probed = null;
+extensionStubs['ms-toolsai.jupyter'] = {
+  isActive: true,
+  exports: {
+    kernels: {
+      getKernel: function (uri) {
+        return Promise.resolve({
+          status: 'idle',
+          executeCode: function (code) {
+            probed = code;
+            return (async function* () {
+              yield {
+                items: [{
+                  mime: 'application/vnd.code.notebook.stdout',
+                  data: Buffer.from('{"k_B": 1.380649e-23, "T": 301.5}\n', 'utf8')
+                }]
+              };
+            }());
+          }
+        });
+      }
+    }
+  }
+};
+DEFAULTS.jupyterValues = true;
+captured.kernelKey = null;
+captured.kernelAnswers = null;
+captured.update(true);
+
+setTimeout(function () {
+  const afterKernel = posted.filter(function (m) { return m.type === 'render'; }).pop();
+  check('the kernel was asked about the names', /k_B/.test(probed || ''), true);
+  check('the probe does not import into the namespace',
+    /^print\(/.test(probed || ''), true);
+  check('kernel values are used', afterKernel.valueSource, 'kernel');
+  check('the kernel value wins over the file',
+    /301\.5/.test(afterKernel.statements[0].html), true);
+
+  // Back to a plain file for the remaining tests.
+  extensionStubs['ms-toolsai.jupyter'] = undefined;
+  vscodeStub.workspace.notebookDocuments = [];
+  DEFAULTS.substituteValues = false;
+  DEFAULTS.jupyterValues = true;
+  editor.document = makeDocument(code, 'python');
+  editor.selection = new Selection(new Position(line, 4), new Position(line, 4));
+  vscodeStub.window.visibleTextEditors = [editor];
+  pinTests();
+}, 200);
+
+function pinTests() {
+
 // Pin freezes updates.
 view.webview._onMessage({ type: 'pin' });
 const before = posted.length;
@@ -289,5 +404,7 @@ setTimeout(function () {
     process.exit(fail ? 1 : 0);
   }, 200);
 }, 200);
+
+}
 
 }

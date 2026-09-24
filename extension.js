@@ -3,6 +3,8 @@
 const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
 const { collectValues, valuesFromDebugger, importAliases } = require('./src/values');
+const { formatNumber } = require('./src/evaluate');
+const { readKernelValues } = require('./src/jupyter');
 
 // How much text around the cursor is scanned. Big enough for any wrapped
 // formula, small enough that a huge file costs nothing per keystroke.
@@ -32,16 +34,44 @@ function readConfig(doc) {
     maxLines: c.get('maxLines', 40),
     substituteValues: c.get('substituteValues', false),
     valueDigits: c.get('valueDigits', 6),
+    jupyterValues: c.get('jupyterValues', true),
     valueScanLines: VALUE_LINES
   };
 }
 
-// The text above the cursor that assignments are read from.
+// The notebook a cell belongs to, if this document is a cell at all.
+function notebookFor(doc) {
+  if (!doc || !doc.uri || doc.uri.scheme !== 'vscode-notebook-cell') return null;
+  const books = vscode.workspace.notebookDocuments || [];
+  for (let i = 0; i < books.length; i++) {
+    const cells = books[i].getCells();
+    for (let k = 0; k < cells.length; k++) {
+      if (cells[k].document === doc) return { notebook: books[i], index: cells[k].index };
+    }
+  }
+  return null;
+}
+
+// The text above the cursor that assignments are read from. In a notebook the
+// variables were defined in earlier cells, which are separate documents, so
+// those have to be gathered too or nothing is ever known.
 function valueWindow(doc, selection) {
   const first = Math.max(0, selection.start.line - VALUE_LINES);
   const range = new vscode.Range(first, 0, selection.start.line,
     doc.lineAt(selection.start.line).text.length);
-  return doc.getText(range);
+  const here = doc.getText(range);
+
+  const cell = notebookFor(doc);
+  if (!cell) return here;
+
+  const earlier = [];
+  cell.notebook.getCells().forEach(function (c) {
+    if (c.index >= cell.index) return;
+    if (c.kind !== vscode.NotebookCellKind.Code) return;
+    earlier.push(c.document.getText());
+  });
+  earlier.push(here);
+  return earlier.join('\n');
 }
 
 // The frame a paused debug session is stopped in, when the running VS Code is
@@ -71,6 +101,10 @@ class PrettyMathView {
     this.liveKey = null;       // frame + names the cached answers belong to
     this.liveAnswers = null;
     this.livePending = null;   // a lookup already in flight for that key
+    this.kernelKey = null;     // the same, for a notebook kernel
+    this.kernelAnswers = null;
+    this.kernelPending = null;
+    this.lastUri = null;       // the editor the last drawing came from
     this.decoration = vscode.window.createTextEditorDecorationType({
       backgroundColor: new vscode.ThemeColor('editor.selectionHighlightBackground'),
       borderRadius: '2px'
@@ -122,6 +156,15 @@ class PrettyMathView {
     return vscode.window.visibleTextEditors.find(function (e) {
       return e.document.uri.toString() === this.last.uri;
     }.bind(this)) || null;
+  }
+
+  // The editor the last drawing came from, while it is still open.
+  rememberedEditor() {
+    if (!this.lastUri) return null;
+    const uri = this.lastUri;
+    return (vscode.window.visibleTextEditors || []).find(function (e) {
+      return e.document.uri.toString() === uri;
+    }) || null;
   }
 
   highlight(s, e) {
@@ -183,27 +226,38 @@ class PrettyMathView {
     if (this.pinned && !force) return;
     if (this.pinned && force && this.last) { this.post(this.last); return; }
 
-    const editor = vscode.window.activeTextEditor;
+    // Clicking a button in the panel takes focus out of the editor, and with a
+    // notebook cell that can leave activeTextEditor undefined for a moment.
+    // Wiping the panel then would look exactly like a crash, so the editor the
+    // last drawing came from is used until a real one takes over.
+    const editor = vscode.window.activeTextEditor || this.rememberedEditor();
     if (!editor) {
       this.post({ type: 'empty', reason: 'Open a file and put the cursor on a formula.' });
       return;
     }
+    this.lastUri = editor.document.uri.toString();
 
     const cfg = readConfig(editor.document);
     const sel = editor.selection;
     const win = windowAround(editor.document, sel);
 
-    // Qualifiers the file itself declares, so `cn.R` reads as R after
-    // `from scipy import constants as cn`.
+    // Everything above the cursor, including earlier notebook cells. Used both
+    // for the qualifiers the file declares and for what the variables hold.
+    let above = '';
     try {
-      const head = editor.document.getText(new vscode.Range(0, 0,
-        Math.min(editor.document.lineCount - 1, 200), 0));
-      const aliases = importAliases(head).filter(function (a) {
+      above = valueWindow(editor.document, sel);
+    } catch (err) {
+      above = '';
+    }
+
+    // `cn.R` reads as R after `from scipy import constants as cn`.
+    try {
+      const aliases = importAliases(above).filter(function (a) {
         return cfg.stripNamespaces.indexOf(a) === -1;
       });
       if (aliases.length) cfg.stripNamespaces = cfg.stripNamespaces.concat(aliases);
     } catch (err) {
-      // a file too short for the range, or anything else: not worth failing over
+      // not worth failing a drawing over
     }
 
     let selStart = editor.document.offsetAt(sel.start) - win.base;
@@ -215,8 +269,7 @@ class PrettyMathView {
     let values = null;
     if (cfg.substituteValues) {
       try {
-        values = collectValues(valueWindow(editor.document, sel),
-          editor.document.languageId, cfg);
+        values = collectValues(above, editor.document.languageId, cfg);
       } catch (err) {
         values = null;
       }
@@ -236,7 +289,9 @@ class PrettyMathView {
       return;
     }
 
+    const cell = notebookFor(editor.document);
     const debugging = cfg.substituteValues && !!vscode.debug.activeDebugSession;
+    const askingKernel = cfg.substituteValues && cfg.jupyterValues && !!cell && !debugging;
     this.last = {
       type: 'render',
       uri: editor.document.uri.toString(),
@@ -257,6 +312,75 @@ class PrettyMathView {
     this.post(this.last);
 
     if (debugging) this.enrichFromDebugger(payload, values, run, cfg);
+    else if (askingKernel) this.enrichFromKernel(payload, values, run, cfg, cell);
+  }
+
+  // Asks the notebook's kernel what the names in this statement hold. Like the
+  // debugger path this runs after the first paint, so nothing waits on it.
+  enrichFromKernel(payload, fileValues, run, cfg, cell) {
+    const wanted = [];
+    payload.statements.forEach(function (st) {
+      (st.names || []).forEach(function (n) {
+        if (wanted.indexOf(n) === -1 && wanted.length < MAX_LIVE_LOOKUPS) wanted.push(n);
+      });
+    });
+    if (!wanted.length) return;
+
+    const key = cell.notebook.uri.toString() + '|' + wanted.join(',');
+    if (this.kernelKey === key && this.kernelAnswers) {
+      this.applyKernelValues(this.kernelAnswers, fileValues, run, cfg);
+      return;
+    }
+    if (this.kernelPending === key) return;
+    this.kernelPending = key;
+
+    const token = ++this.liveToken;
+    const source = new vscode.CancellationTokenSource();
+    const give_up = setTimeout(function () { source.cancel(); }, LIVE_TIMEOUT_MS);
+
+    Promise.resolve()
+      .then(() => {
+        const jup = vscode.extensions.getExtension('ms-toolsai.jupyter');
+        if (!jup) return null;
+        return jup.isActive ? jup.exports : jup.activate();
+      })
+      .then((api) => {
+        if (!api) return null;
+        return readKernelValues(api, cell.notebook.uri, wanted, { token: source.token });
+      })
+      .then((numbers) => {
+        clearTimeout(give_up);
+        this.kernelPending = null;
+        if (!numbers || token !== this.liveToken) return;
+        if (!this.view || !this.view.visible || this.pinned) return;
+        this.kernelKey = key;
+        this.kernelAnswers = numbers;
+        this.applyKernelValues(numbers, fileValues, run, cfg);
+      })
+      .catch(() => {
+        clearTimeout(give_up);
+        this.kernelPending = null;
+      });
+  }
+
+  applyKernelValues(numbers, fileValues, run, cfg) {
+    const live = {};
+    Object.keys(numbers).forEach(function (name) {
+      const shown = formatNumber(numbers[name], cfg.valueDigits);
+      if (shown !== null) live[name] = { num: numbers[name], text: shown, live: true };
+    });
+    if (!Object.keys(live).length) return;
+    let updated;
+    try {
+      updated = run(Object.assign({}, fileValues || {}, live));
+    } catch (err) {
+      return;
+    }
+    this.last = Object.assign({}, this.last, {
+      statements: updated.statements,
+      valueSource: 'kernel'
+    });
+    this.post(this.last);
   }
 
   // Asks a paused debug session what the names in this statement are worth, and
@@ -399,6 +523,18 @@ function activate(context) {
     vscode.debug.onDidTerminateDebugSession(function () { provider.update(true); }),
     vscode.debug.onDidStartDebugSession(function () { provider.update(true); })
   );
+
+  // Running a cell changes what the kernel holds, so anything remembered from
+  // it is stale.
+  if (vscode.workspace.onDidChangeNotebookDocument) {
+    context.subscriptions.push(
+      vscode.workspace.onDidChangeNotebookDocument(function () {
+        provider.kernelKey = null;
+        provider.kernelAnswers = null;
+        provider.schedule();
+      })
+    );
+  }
 }
 
 function deactivate() {}

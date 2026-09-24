@@ -4,6 +4,29 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.5] — 2026-09-24
+
+### Added
+
+- Notebook support for values. A cell is its own document, so the variables a
+  formula refers to were defined in earlier cells; those are now read as well,
+  which is what makes values work at all in a notebook.
+- Values from a running Jupyter kernel, shown as **Values · kernel**. This is
+  what lets `a0 = cn.value("Bohr radius")` show a number: no reading of the file
+  can resolve a library lookup, but the kernel already knows. One short
+  statement is sent, it defines nothing, and a busy kernel is left alone.
+  Turn it off with `prettyMath.jupyterValues`.
+
+### Fixed
+
+- The panel no longer empties itself when no editor is focused. Clicking a
+  toolbar button moves focus out of the editor, and with a notebook cell that
+  can leave `activeTextEditor` undefined — so toggling Values replaced the
+  drawing with the "open a file" hint, which looked like a crash. The editor the
+  last drawing came from is used until another one takes over.
+- Module aliases are picked up from earlier notebook cells too, so an `import`
+  in the first cell applies in the tenth.
+
 ## [0.1.4] — 2026-09-23
 
 ### Fixed

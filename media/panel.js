@@ -192,15 +192,18 @@
       // ones read from the file are a guess about what the code will do.
       valButton.textContent = !msg.substituting ? 'Values'
         : msg.valueSource === 'debugger' ? 'Values · live'
+        : msg.valueSource === 'kernel' ? 'Values · kernel'
         : msg.valueSource === 'file' ? 'Values · file'
         : 'Values · none';
       valButton.title = !msg.substituting
         ? 'Plug in what the variables are worth'
         : msg.valueSource === 'debugger'
           ? 'Values from the paused debug session'
-          : msg.valueSource === 'file'
-            ? 'Values read from assignments above the cursor, not from a running program'
-            : 'No value could be worked out for any variable here';
+          : msg.valueSource === 'kernel'
+            ? 'Values from the running notebook kernel'
+            : msg.valueSource === 'file'
+              ? 'Values read from assignments above the cursor, not from a running program'
+              : 'No value could be worked out for any variable here';
     }
 
     content.textContent = '';

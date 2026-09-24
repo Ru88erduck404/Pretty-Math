@@ -114,15 +114,35 @@ back to the symbols. It is off until you turn it on, and the state is the
 `prettyMath.substituteValues` setting, so it persists; *Pretty Math: Toggle
 Variable Values* does the same from the command palette.
 
-The numbers come from one of two places, and the button says which:
+The numbers come from one of three places, and the button says which:
 
 - **Values · live** — a debug session is paused, and each name was evaluated in
   the frame you are stopped in. These are the real values, and they are drawn
   with a dotted underline. Stepping redraws them.
-- **Values · file** — no debugger, so assignments above the cursor were read
-  instead. **Nothing is executed**: each right-hand side is parsed and folded by
-  a closed evaluator that knows arithmetic and the usual maths functions and
-  nothing else. `n = 60 * 60` gives 3600; `n = fetch()` gives nothing.
+- **Values · kernel** — in a notebook, the running kernel was asked what each
+  name holds, the way the Variables view does. This is what makes a line like
+  `a0 = cn.value("Bohr radius")` show a number: no amount of reading the file
+  can work out a library lookup, but the kernel already knows the answer.
+- **Values · file** — no debugger and no kernel, so assignments above the cursor
+  were read instead. **Nothing is executed**: each right-hand side is parsed and
+  folded by a closed evaluator that knows arithmetic and the usual maths
+  functions and nothing else. `n = 60 * 60` gives 3600; `n = fetch()` gives
+  nothing.
+
+### In notebooks
+
+A notebook cell is its own document, so the variables a formula refers to were
+almost always defined in *earlier* cells. Those are read too — the cells above
+the current one, in order — which is what makes values work at all in a
+notebook.
+
+If the Jupyter extension is installed and the kernel is idle, the kernel is
+asked as well, and its answers win. One short statement is sent, the same shape
+as a Variables-view lookup: it prints a JSON object of the names that currently
+hold a finite real number, and defines nothing. Names bound to arrays, strings,
+booleans, complex numbers or infinities are left as names, and a busy kernel is
+never interrupted — your own work is not queued behind this. Turn it off with
+`prettyMath.jupyterValues`.
 
 Read values are a static guess: the last assignment before the cursor wins,
 whether or not the code would have taken that branch. Live values have no such
