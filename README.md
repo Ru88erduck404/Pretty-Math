@@ -13,21 +13,12 @@ w[i] = w[i] - eta * grad[i] / (math.sqrt(v[i]) + eps)
 w_i  =  w_i  −  ──────────
                  √(v_i) + ε
 ```
-
 The point is not decoration. `a / b * c` draws only `b` under the bar, so the
 classic precedence slip is visible instead of inferred.
+<img width="414" height="253" alt="image" src="https://github.com/user-attachments/assets/ca725d68-bf9a-4254-b3b0-961c2f3bc98d" />
 
-<!-- Screenshots: capture them as described in docs/README.md, save them as
-     docs/panel.png and docs/precedence.png, then delete these two comment
-     markers so the images below show. Until the files exist the links would
-     render as broken images, which is why they are commented out.
-
-![The quadratic formula rendered in the panel](docs/panel.png)
-
-![The same line with and without brackets](docs/precedence.png)
-
--->
-<!-- end screenshots -->
+More complex equations will be easier to overview.
+<img width="810" height="337" alt="image" src="https://github.com/user-attachments/assets/87c14f14-9edd-4572-9802-89c422476418" />
 
 ## Using it
 
