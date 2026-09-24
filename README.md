@@ -31,7 +31,7 @@ classic precedence slip is visible instead of inferred.
 
 ## Using it
 
-- Open the panel: **Ctrl+Alt+M** (`Cmd+Alt+M` on macOS), or *Pretty Math: Show
+- Open the panel: **Alt+P** or **Ctrl+Alt+M** (`Cmd+Alt+M` on macOS), or *Pretty Math: Show
   Panel* from the command palette. It docks next to Terminal and Problems.
 - Put the cursor anywhere on a line. The whole statement is picked up, including
   one that wraps over several lines, with comments and `return` / `if` / a C type
@@ -128,6 +128,12 @@ The numbers come from one of three places, and the button says which:
   folded by a closed evaluator that knows arithmetic and the usual maths
   functions and nothing else. `n = 60 * 60` gives 3600; `n = fetch()` gives
   nothing.
+
+Constants a module owns are known too, looked up through whatever the file
+called the module. After `from scipy import constants as cn`, `cn.bar` is 10⁵
+and `cn.R` is the gas constant. That matters more than it sounds: an unknown
+anywhere in a chain makes everything downstream unknown, so one
+`P = 1.013*cn.bar` was once enough to leave every value after it blank.
 
 ### In notebooks
 

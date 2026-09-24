@@ -107,7 +107,7 @@ check('tuple assignment keeps both names',
 check('string contents survive',
   atLine(SCIPY, 'a0 =').html.indexOf('Bohr radius') >= 0, true);
 
-const { importAliases } = require('../src/values');
+const { importAliases, importModules } = require('../src/values');
 check('import aliases found', importAliases(SCIPY).join(','), 'sp,cn');
 check('plain from-import is a qualifier too',
   importAliases('from scipy import constants\n').join(','), 'constants');
@@ -119,6 +119,45 @@ const ALIASED = Object.assign({}, CFG, {
 check('an aliased module is dropped from the drawing',
   atLine(SCIPY, 'eq1 =', ALIASED).latex,
   '\\mathrm{eq}_{1} = 1 + x = \\sqrt{y^{-3}} \\cdot a_{0} \\cdot R');
+
+// ---- constants a module owns ----------------------------------------------
+// A single unknown in a chain makes everything after it unknown, which is how
+// one `cn.bar` can leave a whole notebook showing no values at all.
+const ABSORPTION = [
+  'import sympy as sp',
+  'from scipy import constants as cn',
+  'Vol = 5000',
+  'T = 20+273.15',
+  'P = 1.013*cn.bar',
+  'y_NH3_i = 0.25',
+  'y_inert_i = 0.75',
+  'X_i = 0',
+  'Y_i = y_NH3_i/y_inert_i',
+  'G = ((P*Vol)/(cn.R*T))/1000',
+  'Gm = G*(1-y_NH3_i)',
+  'N = sp.symbols("N")',
+  'L = 165.37*1.5',
+  'Lm = (1-X_i)*L',
+  'A = (Gm)*1.26/Lm',
+  ''
+].join('\n');
+
+check('an alias records the module it stands for',
+  importModules(ABSORPTION).cn, 'scipy.constants');
+check('a plain import too', importModules('import numpy as np\n').np, 'numpy');
+
+const scan = require('../src/values').collectValues;
+const chain = scan(ABSORPTION, 'python', CFG);
+check('a scipy constant resolves', chain.P.text, '101300');
+check('and so does one reached through a function call chain', chain.G.text, '207.805');
+check('the value that depends on it resolves', chain.Gm.text, '155.854');
+check('and the one after that', chain.A.text, '0.791661');
+check('a sympy symbol stays unknown', chain.N, undefined);
+check('the gas constant is the CODATA one',
+  scan('from scipy import constants as c\nx = c.R\n', 'python', CFG).x.text,
+  '8.31446');
+check('an unimported name is not treated as a module constant',
+  scan('x = cn.bar\n', 'python', CFG).x, undefined);
 
 // ---- substituting variable values -----------------------------------------
 const { collectValues, valuesFromDebugger } = require('../src/values');

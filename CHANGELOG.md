@@ -4,6 +4,18 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.6] — 2026-09-24
+
+### Added
+
+- **Alt+P** opens the panel, alongside Ctrl+Alt+M.
+- Constants a module owns are known to the value scanner, looked up through
+  whatever the file called the module: after `from scipy import constants as cn`,
+  `cn.bar` is 10⁵ and `cn.R` is the CODATA gas constant. This matters more than
+  it sounds — an unknown anywhere in a chain of assignments makes everything
+  downstream unknown, so a single `P = 1.013*cn.bar` was enough to leave `G`,
+  `Gm` and `A` with no values at all.
+
 ## [0.1.5] — 2026-09-24
 
 ### Added

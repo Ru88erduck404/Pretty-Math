@@ -40,6 +40,8 @@ function collectValues(text, languageId, config) {
   const digits = cfg.valueDigits || 6;
   const env = {};
   const out = {};
+  // What the file called each module, so cn.bar resolves to scipy's bar.
+  const modules = importModules(text);
 
   const lines = String(text).split('\n');
   const start = Math.max(0, lines.length - (cfg.valueScanLines || 500));
@@ -82,7 +84,7 @@ function collectValues(text, languageId, config) {
     let value = null;
     try {
       const ast = parse(rhs, flavor);
-      value = evaluate(ast, env, strip);
+      value = evaluate(ast, env, strip, modules);
     } catch (err) {
       value = null;
     }
@@ -135,32 +137,39 @@ function valuesFromDebugger(raw, digits) {
 // `from scipy import constants as cn` make sp and cn qualifiers, so cn.R should
 // be drawn as R -- the same treatment np and math get by default, but learned
 // from the file rather than configured.
-const IMPORT_AS = /^\s*(?:from\s+[\w.]+\s+)?import\s+(.+)$/;
+const IMPORT_LINE = /^\s*(?:from\s+([\w.]+)\s+)?import\s+(.+)$/;
 
-function importAliases(text) {
-  const found = [];
+// { alias: "the module it stands for" }, so `from scipy import constants as cn`
+// records cn -> scipy.constants and cn.bar can be looked up in that module's
+// own table of constants.
+function importModules(text) {
+  const found = {};
   String(text).split('\n').forEach(function (line) {
     if (line.indexOf('import') === -1) return;
-    const m = IMPORT_AS.exec(line.split('#')[0]);
+    const m = IMPORT_LINE.exec(line.split('#')[0]);
     if (!m) return;
-    m[1].split(',').forEach(function (piece) {
+    const from = m[1] || null;
+    m[2].split(',').forEach(function (piece) {
       const as = /^\s*([\w.]+)\s+as\s+([A-Za-z_]\w*)\s*$/.exec(piece);
       if (as) {
-        if (found.indexOf(as[2]) === -1) found.push(as[2]);
+        found[as[2]] = from ? from + '.' + as[1] : as[1];
         return;
       }
       // `from scipy import constants` makes `constants` a qualifier too.
       const plain = /^\s*([A-Za-z_]\w*)\s*$/.exec(piece);
-      if (plain && /^\s*from\s/.test(line) && found.indexOf(plain[1]) === -1) {
-        found.push(plain[1]);
-      }
+      if (plain && from) found[plain[1]] = from + '.' + plain[1];
     });
   });
   return found;
 }
 
+function importAliases(text) {
+  return Object.keys(importModules(text));
+}
+
 module.exports = {
   collectValues: collectValues,
   valuesFromDebugger: valuesFromDebugger,
-  importAliases: importAliases
+  importAliases: importAliases,
+  importModules: importModules
 };

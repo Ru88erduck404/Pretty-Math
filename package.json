@@ -2,7 +2,7 @@
   "name": "pretty-math",
   "displayName": "Pretty Math",
   "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "publisher": "ru88erduck404",
   "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
   "license": "MIT",
@@ -32,6 +32,7 @@
       { "command": "prettyMath.toggleValues", "title": "Toggle Variable Values", "category": "Pretty Math" }
     ],
     "keybindings": [
+      { "command": "prettyMath.show", "key": "alt+p", "mac": "alt+p" },
       { "command": "prettyMath.show", "key": "ctrl+alt+m", "mac": "cmd+alt+m" }
     ],
     "menus": {
