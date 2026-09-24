@@ -13,7 +13,7 @@
 const { flavorFor } = require('./flavors');
 const { parse } = require('./parser');
 const { stripComments, stripScaffolding, flatten, fromDocument } = require('./prep');
-const { evaluate, formatNumber } = require('./evaluate');
+const { evaluate, formatNumber, MODULE_CONSTANTS } = require('./evaluate');
 
 // `name = rest`, allowing a type annotation and an augmented operator.
 const ASSIGN = /^([A-Za-z_$À-￿][\w$.À-￿]*)\s*(?::\s*[^=]+?\s*)?(=|\+=|-=|\*=|\/=|\*\*=|:=)\s*(.+)$/;
@@ -112,6 +112,25 @@ function collectValues(text, languageId, config) {
     }
   }
 
+  // A module's constants are worth showing where they appear, not just where
+  // they feed an assignment: with values on, `cn.R * T` should read 8.31446 · T
+  // rather than R · T. Only the qualified spelling is recorded, so a variable
+  // of your own called R is never mistaken for the gas constant.
+  Object.keys(modules).forEach(function (alias) {
+    const table = MODULE_CONSTANTS[modules[alias]];
+    if (!table) return;
+    const used = new RegExp('\\b' + alias.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') +
+      '\\.([A-Za-z_]\\w*)\\b', 'g');
+    let m;
+    while ((m = used.exec(text)) !== null) {
+      const attr = m[1];
+      if (!Object.prototype.hasOwnProperty.call(table, attr)) continue;
+      const shown = formatNumber(table[attr], digits);
+      if (shown === null) continue;
+      out[alias + '.' + attr] = { num: table[attr], text: shown, constant: true };
+    }
+  });
+
   return out;
 }
 
@@ -155,9 +174,11 @@ function importModules(text) {
         found[as[2]] = from ? from + '.' + as[1] : as[1];
         return;
       }
-      // `from scipy import constants` makes `constants` a qualifier too.
-      const plain = /^\s*([A-Za-z_]\w*)\s*$/.exec(piece);
-      if (plain && from) found[plain[1]] = from + '.' + plain[1];
+      // `from scipy import constants` makes `constants` a qualifier, and a
+      // plain `import math` makes `math` stand for itself -- otherwise
+      // `import numpy as np` would know np.pi while `import numpy` did not.
+      const plain = /^\s*([\w.]+)\s*$/.exec(piece);
+      if (plain) found[plain[1]] = from ? from + '.' + plain[1] : plain[1];
     });
   });
   return found;

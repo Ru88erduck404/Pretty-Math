@@ -131,6 +131,20 @@ check('math.e', consts.nat.text, '2.71828');
 check('the module map records what each alias means',
   importModules(SCIPY_FILE).cn, 'scipy.constants');
 
+// A constant is worth showing where it appears, not only where it feeds an
+// assignment: cn.R * T should read 8.31446 · T once values are on.
+const USES = 'from scipy import constants as cn\nT = 300\nq = cn.R * T\n';
+const useVals = collectValues(USES, 'python', CFG);
+check('a constant used in a formula is recorded', useVals['cn.R'].text, '8.31446');
+check('and it is drawn in place of the symbol',
+  drawn('q = cn.R * T', 'python', useVals), 'q=8.31446·300');
+check('but only under its qualified spelling, so your own R is untouched',
+  useVals.R, undefined);
+check('a variable of your own called R keeps its own value',
+  collectValues('R = 5\nx = R\n', 'python', CFG).R.text, '5');
+check('an unused constant is not recorded',
+  useVals['cn.bar'], undefined);
+
 // ---- builtins and comprehensions ------------------------------------------
 check('sum over a comprehension', drawn('t = sum(x**2 for x in xs)'), 't=∑x∈xsx2');
 check('all is for-all', drawn('ok = all(x > 0 for x in xs)'), /∀/);

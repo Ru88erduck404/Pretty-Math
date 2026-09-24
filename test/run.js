@@ -111,7 +111,11 @@ const { importAliases, importModules } = require('../src/values');
 check('import aliases found', importAliases(SCIPY).join(','), 'sp,cn');
 check('plain from-import is a qualifier too',
   importAliases('from scipy import constants\n').join(','), 'constants');
-check('a plain import is not', importAliases('import math\n').join(','), '');
+// A plain import makes the module stand for itself, so `import numpy` knows
+// numpy.pi exactly as `import numpy as np` knows np.pi.
+check('a plain import stands for itself', importAliases('import math\n').join(','), 'math');
+check('a dotted plain import too',
+  importModules('import scipy.constants\n')['scipy.constants'], 'scipy.constants');
 
 const ALIASED = Object.assign({}, CFG, {
   stripNamespaces: CFG.stripNamespaces.concat(importAliases(SCIPY))
