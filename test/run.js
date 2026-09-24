@@ -291,8 +291,13 @@ check('unicode identifiers', tex('længde = bredde * højde'),
   '\\mathrm{længde} = \\mathrm{bredde} \\cdot \\mathrm{højde}');
 check('accented single letters stay italic', tex('é = 2'), 'é = 2');
 check('C++ scope resolution', tex('d = std::sqrt(x)', 'cpp'), 'd = \\sqrt{x}');
+// A qualifier that was not configured away stays: dropping it would hide which
+// object the call came from.
 check('scope resolution keeps unknown namespaces', tex('y = ns::f(x)', 'cpp'),
-  'y = \\operatorname{f}\\left(x\\right)');
+  'y = \\mathrm{ns}.\\operatorname{f}\\left(x\\right)');
+check('an unconfigured qualifier is kept on a call', tex('rows = pd.read_csv(p)'),
+  '\\mathrm{rows} = \\mathrm{pd}.\\operatorname{read\\_csv}\\left(p\\right)');
+check('a configured one is still dropped', tex('y = np.sqrt(x)'), 'y = \\sqrt{x}');
 check('python slice still works', tex('y = arr[::2]'), 'y = \\mathrm{arr}\\left[::2\\right]');
 check('plain index is a subscript', tex('y = arr[i]'), 'y = \\mathrm{arr}_{i}');
 check('star args parse', tex('y = f(*args)'), 'y = \\operatorname{f}\\left({\\ast }\\mathrm{args}\\right)');

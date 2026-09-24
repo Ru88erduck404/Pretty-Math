@@ -4,6 +4,37 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.7] — 2026-09-24
+
+### Fixed
+
+- `log(x)**2` drew the function as the literal word "undefined". `log` is
+  described in the function table by its kind alone, with no printable name, so
+  the powered form had nothing to print; the name it was called by is now the
+  fallback, and a test walks every powerable name to be sure none of the others
+  can do it.
+- A qualifier that was not configured away is kept on a call:
+  `pd.read_csv(path)` was drawn as `read_csv(path)`, silently losing which
+  object it came from. Configured ones — `np`, `math`, `self` — are still
+  dropped.
+- `valueDigits` is honoured in exponential form. It was capped at five
+  significant digits, so `1.380649e-23` printed as `1.3806e-23` whatever the
+  setting said.
+- The code sent to a kernel now refuses anything that is not a plain identifier
+  itself, rather than relying on its caller to have filtered. Unicode names such
+  as `længde` are allowed, as Python allows them.
+
+### Added
+
+- `test/libraries.js`, which asserts every library claim the README makes, so
+  the documentation cannot drift away from the behaviour.
+- `test/hostile.js`: prototype-shaped variable names, arithmetic with no
+  sensible answer, malformed kernel and debugger replies, files built to be
+  awkward, and attempts to get something other than a name into the kernel
+  probe.
+- The fuzzer now draws half its cases with values plugged in, which is what
+  found the `log(x)**2` bug.
+
 ## [0.1.6] — 2026-09-24
 
 ### Added

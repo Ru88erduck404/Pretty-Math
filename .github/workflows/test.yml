@@ -33,3 +33,9 @@ jobs:
 
       - name: Fuzz
         run: node test/fuzz.js
+
+      - name: Library support
+        run: node test/libraries.js
+
+      - name: Hostile input
+        run: node test/hostile.js

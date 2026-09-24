@@ -661,9 +661,22 @@ function makeRenderer(opts) {
     }
 
     // Anything else: upright name (or a rendered callee) with its arguments.
-    const calleeHtml = name !== null
-      ? '<span class="pm-fn">' + esc(name.split('.').pop()) + '</span>'
-      : render(node.callee).html;
+    // A qualifier that was not configured away is kept, or `pd.read_csv(path)`
+    // would be drawn as `read_csv(path)` and quietly lose which object it came
+    // from. resolveName has already dropped the ones that should go.
+    let calleeHtml;
+    if (name === null) {
+      calleeHtml = render(node.callee).html;
+    } else if (name.indexOf('.') === -1) {
+      calleeHtml = '<span class="pm-fn">' + esc(name) + '</span>';
+    } else {
+      const bits = name.split('.');
+      const fn = bits.pop();
+      calleeHtml = bits.map(function (b) {
+        return '<span class="pm-name">' + esc(b) + '</span>';
+      }).join('<span class="pm-punct">.</span>') +
+        '<span class="pm-punct">.</span><span class="pm-fn">' + esc(fn) + '</span>';
+    }
     const parts = args.map(function (a) { return render(a); });
     const tall = parts.some(function (p) { return p.tall; });
     const inner = parts.map(function (p) { return p.html; })
@@ -682,8 +695,12 @@ function makeRenderer(opts) {
       const nm = resolveName(baseNode.callee);
       const last = nm ? nm.split('.').pop() : null;
       if (last && S.POWERABLE.has(last) && baseNode.args.length === 1) {
-        const spec = S.FUNCTIONS[last] || { name: last, bare: true };
-        const withSup = Object.assign({}, spec, { supHtml: render(expNode).html });
+        // Not every entry carries a printable name -- `log` is described by its
+        // kind alone -- so the name it was called by is the fallback. Without
+        // this, log(x)**2 drew the function as the word "undefined".
+        const spec = S.FUNCTIONS[last] || {};
+        const withSup = Object.assign({ name: last, bare: true }, spec,
+          { supHtml: render(expNode).html });
         const r = namedCall(withSup, node, baseNode.args);
         return { html: r.html, prec: ATOM, tall: r.tall };
       }

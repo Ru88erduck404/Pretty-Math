@@ -13,11 +13,28 @@
 
 const PROBE_PREFIX = '__pretty_math_probe__';
 
+// A name is only ever a plain identifier. Nothing else may reach the source
+// that gets sent to a kernel: this is the one place where text from a file
+// becomes code somewhere else, so it refuses anything unexpected itself rather
+// than trusting its caller to have filtered.
+// Python 3 identifiers may be any Unicode letter, so `længde` has to be
+// allowed; what must not get through is a quote, a backslash, a newline, a dot
+// or anything else that could end the string and start being code.
+const SAFE_NAME = /^[\p{L}\p{Nl}_][\p{L}\p{Nl}\p{Nd}\p{Mn}\p{Mc}_]*$/u;
+
+function safeNames(names) {
+  return (names || []).filter(function (n) {
+    return typeof n === 'string' && n.length <= 80 && SAFE_NAME.test(n);
+  });
+}
+
 // One statement, no imports left behind, no `_` history disturbed: builds a
 // dict of the names that currently hold a finite real number and prints it as
 // JSON. Names it cannot resolve are simply missing from the result.
 function probeSource(names) {
-  const list = names.map(function (n) { return JSON.stringify(n); }).join(', ');
+  const clean = safeNames(names);
+  if (!clean.length) return null;
+  const list = clean.map(function (n) { return JSON.stringify(n); }).join(', ');
   return 'print(__import__("json").dumps({k: float(v) for k, v in ' +
     '((n, globals().get(n)) for n in [' + list + ']) ' +
     'if isinstance(v, __import__("numbers").Real) and not isinstance(v, bool) ' +
@@ -59,8 +76,8 @@ function parseProbe(text) {
 async function readKernelValues(api, notebookUri, names, options) {
   const opts = options || {};
   if (!api || !api.kernels || typeof api.kernels.getKernel !== 'function') return null;
-  const plain = names.filter(function (n) { return /^[A-Za-z_]\w*$/.test(n); });
-  if (!plain.length) return null;
+  const source = probeSource(names);
+  if (!source) return null;
 
   const kernel = await api.kernels.getKernel(notebookUri);
   if (!kernel || typeof kernel.executeCode !== 'function') return null;
@@ -69,7 +86,7 @@ async function readKernelValues(api, notebookUri, names, options) {
   if (kernel.status && kernel.status !== 'idle') return null;
 
   const outputs = [];
-  const iterator = kernel.executeCode(probeSource(plain), opts.token);
+  const iterator = kernel.executeCode(source, opts.token);
   for await (const output of iterator) {
     outputs.push(output);
     if (outputs.length > 20) break;
@@ -89,6 +106,7 @@ async function readKernelValues(api, notebookUri, names, options) {
 module.exports = {
   readKernelValues: readKernelValues,
   probeSource: probeSource,
+  safeNames: safeNames,
   parseProbe: parseProbe,
   decodeOutputs: decodeOutputs,
   PROBE_PREFIX: PROBE_PREFIX

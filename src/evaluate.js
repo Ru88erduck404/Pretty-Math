@@ -235,7 +235,9 @@ function formatNumber(n, digits) {
 
   const size = Math.abs(n);
   if (size !== 0 && (size < 1e-4 || size >= 1e9)) {
-    return n.toExponential(Math.min(d - 1, 4))
+    // The configured number of significant digits applies here too: capping it
+    // made 1.380649e-23 print as 1.3806e-23 whatever the setting said.
+    return n.toExponential(Math.max(0, Math.min(d - 1, 16)))
       .replace(/\.?0+e/, 'e')
       .replace('e+', 'e');
   }

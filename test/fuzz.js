@@ -13,6 +13,7 @@
 //     and click-to-select trustworthy
 
 const { analyze } = require('../src/pretty');
+const { collectValues } = require('../src/values');
 
 const CFG = {
   multiplication: 'implicit', indexAsSubscript: true, greekLetters: true,
@@ -114,14 +115,36 @@ let cases = 0;
 let rendered = 0;
 let refused = 0;
 
-function trial(src, lang) {
-  const text = 'result = ' + src + '\n';
+// Half the cases are drawn with values plugged in, so the substitution path is
+// fuzzed as hard as the plain one.
+const PRELUDE = [
+  'import sympy as sp',
+  'from scipy import constants as cn',
+  'x = 2', 'y = 3.5', 'n = 10', 'rate = 0.25', 'theta = 1.5', 'v_0 = 9.81',
+  'a_i = 4', 'længde = 7', 'data = 1', 'self = 0',
+  'p = 1.013 * cn.bar', ''
+].join('\n');
+
+function trial(src, lang, withValues) {
+  const text = (withValues ? PRELUDE : '') + 'result = ' + src + '\n';
+  const at = text.length - src.length - 2;
   const started = Date.now();
+  let values = null;
+  if (withValues) {
+    try {
+      values = collectValues(text.slice(0, at), lang, CFG);
+    } catch (err) {
+      failures.push('value scan threw [' + lang + '] ' + JSON.stringify(src) + ' -- ' + err.message);
+      return;
+    }
+  }
   let out;
   try {
-    out = analyze(text, { start: 9, end: 9 }, lang, CFG);
+    out = analyze(text, { start: at, end: at }, lang,
+      values ? Object.assign({}, CFG, { values: values }) : CFG);
   } catch (err) {
-    failures.push('threw [' + lang + '] ' + JSON.stringify(src) + ' -- ' + err.message);
+    failures.push('threw [' + lang + '] values=' + !!withValues + ' ' +
+      JSON.stringify(src) + ' -- ' + err.message);
     return;
   }
   const ms = Date.now() - started;
@@ -154,8 +177,9 @@ const ROUNDS = Number(process.env.PRETTY_MATH_ROUNDS || 1500);
 for (let i = 0; i < ROUNDS; i++) {
   const lang = pick(LANGS);
   const src = expr(3 + Math.floor(rnd() * 3), lang);
-  trial(src, lang);
-  if (chance(0.5)) trial(corrupt(src), lang);
+  const withValues = chance(0.5);
+  trial(src, lang, withValues);
+  if (chance(0.5)) trial(corrupt(src), lang, withValues);
 }
 
 failures.slice(0, 20).forEach(function (f) { console.log('FAIL  ' + f); });

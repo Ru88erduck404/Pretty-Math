@@ -344,7 +344,12 @@ function toLatex(node, opts) {
       }
     }
 
-    const fn = last ? opName(last) : go(n.callee).tex;
+    // Keep a qualifier that was not configured away, as the panel does.
+    const fn = name === null ? go(n.callee).tex
+      : name.indexOf('.') === -1 ? opName(name)
+        : name.split('.').slice(0, -1).map(function (b) {
+          return '\\mathrm{' + b.replace(/_/g, '\\_') + '}';
+        }).join('.') + '.' + opName(last);
     return res(fn + '\\left(' + n.args.map(function (x) { return go(x).tex; }).join(', ') + '\\right)');
   }
 
