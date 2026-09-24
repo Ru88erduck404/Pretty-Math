@@ -1,42 +1,31 @@
 # Screenshots
 
 The Marketplace listing is the top-level `README.md`, rendered from whatever was
-inside the `.vsix` when it was published — so a screenshot there is the first
-thing anyone sees, and it is what sells the extension in two seconds.
+inside the `.vsix` when it was published, so the images at the top of it are the
+first thing anyone sees.
 
-Two images are referenced from the main README and need capturing from a running
-editor. They cannot be generated from this repository: they are pictures of the
-panel inside VS Code, chrome and theme included.
+Those images are hosted on GitHub's attachment CDN — the `user-attachments`
+links in `README.md` — rather than committed here. Dragging a picture into a
+GitHub issue or the web editor uploads it and gives you such a link. They are
+public as long as the repository is, and they are served over HTTPS, which is
+what the Marketplace requires.
 
-## Taking them
+If you would rather keep them in the repository, commit the files under `docs/`
+and reference them relatively (`![alt](docs/panel.png)`); vsce rewrites relative
+image links to raw.githubusercontent URLs when it packages, so both work.
 
-1. Open `docs/screenshot.py` in VS Code with the extension installed.
-2. Open the panel with **Ctrl+Alt+M** and drag its top edge up until the drawing
-   has some room.
-3. Use the **A+** button to raise the font a little; ~26px photographs well.
-4. Put the cursor on the line marked `(1)` — the quadratic formula.
-5. Capture the panel only, not the whole window:
-   - **Windows** — Win+Shift+S, drag over the panel, then paste into Paint and
-     save.
-   - **macOS** — Cmd+Shift+4, drag over the panel; it saves to the Desktop.
-6. Save as `docs/panel.png`.
-7. Repeat with the cursor on the two lines marked `(2)`, capturing both drawings
-   together so the difference is visible, and save as `docs/precedence.png`.
+## Taking new ones
 
-Keep them under about 1500px wide. PNG, not JPEG — the text is thin and JPEG
-smears it.
+`docs/screenshot.py` holds lines chosen to photograph well. Open it with the
+extension installed, press **Alt+P**, drag the panel taller, and raise the font
+with **A+** — about 26px reads well in a screenshot.
 
-## Then
+- **Windows** — Win+Shift+S, drag over the panel, paste into the GitHub editor.
+- **macOS** — Cmd+Shift+4, drag over the panel, then drag the file in.
 
-Delete the HTML comment above the images in the main README, commit the two
-files, and bump the version so the listing picks them up:
+Capture the panel alone rather than the whole window, use a dark theme — the
+panel's colours were chosen against a dark editor background — and keep it under
+about 1500px wide. PNG, not JPEG: the text is thin and JPEG smears it.
 
-```bash
-git add docs/*.png README.md
-git commit -m "Add screenshots to the listing"
-git tag v0.1.2
-git push origin main --tags
-```
-
-A dark theme is the better choice for both: the panel's colours were picked
-against a dark editor background.
+Changing the images only changes the listing once a new version is published,
+because the listing is the README as it was inside the published `.vsix`.
