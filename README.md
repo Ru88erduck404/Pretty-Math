@@ -136,13 +136,32 @@ almost always defined in *earlier* cells. Those are read too — the cells above
 the current one, in order — which is what makes values work at all in a
 notebook.
 
-If the Jupyter extension is installed and the kernel is idle, the kernel is
-asked as well, and its answers win. One short statement is sent, the same shape
-as a Variables-view lookup: it prints a JSON object of the names that currently
-hold a finite real number, and defines nothing. Names bound to arrays, strings,
-booleans, complex numbers or infinities are left as names, and a busy kernel is
-never interrupted — your own work is not queued behind this. Turn it off with
-`prettyMath.jupyterValues`.
+The kernel can be asked too, but that is **off by default** — set
+`prettyMath.jupyterValues` to turn it on. The reason is the permission it needs:
+the Jupyter extension will ask you to allow this extension to *execute code
+against kernels*, which is arbitrary Python in your session. That is a broad
+permission for a narrow use, and nobody should grant it without choosing to.
+
+What actually gets sent is one statement:
+
+```python
+print(__import__("json").dumps({k: float(v) for k, v in ((n, globals().get(n)) for n in [...])
+      if isinstance(v, __import__("numbers").Real) and not isinstance(v, bool)
+      and __import__("math").isfinite(float(v))}))
+```
+
+It reads `globals()`, keeps the names holding a finite real number, and prints
+them as JSON. It assigns nothing and leaves nothing behind — the comprehension's
+variables are scoped to it. A value is never serialised unless it has already
+been shown to be a plain number, so a notebook holding gigabyte arrays is
+untouched: the array fails a pointer-cheap `isinstance` and its name stays a
+name.
+
+It only runs while **Values** is on, only when the kernel is already **idle**,
+at most once every ¾ second, and answers are reused for a couple of seconds, so
+moving around a notebook does not become a stream of kernel executions. The cost
+if something goes wrong — a restarting kernel, a shadowed `print` — is that
+values silently come from the cells above instead.
 
 Read values are a static guess: the last assignment before the cursor wins,
 whether or not the code would have taken that branch. Live values have no such

@@ -334,6 +334,7 @@ Object.defineProperty(vscodeStub.window, 'activeTextEditor', {
 
 // With a kernel, the values come from it instead.
 let probed = null;
+let probeCount = 0;
 extensionStubs['ms-toolsai.jupyter'] = {
   isActive: true,
   exports: {
@@ -343,6 +344,7 @@ extensionStubs['ms-toolsai.jupyter'] = {
           status: 'idle',
           executeCode: function (code) {
             probed = code;
+            probeCount++;
             return (async function* () {
               yield {
                 items: [{
@@ -358,8 +360,8 @@ extensionStubs['ms-toolsai.jupyter'] = {
   }
 };
 DEFAULTS.jupyterValues = true;
-captured.kernelKey = null;
-captured.kernelAnswers = null;
+captured.kernelCache = null;
+captured.kernelProbedAt = 0;
 captured.update(true);
 
 setTimeout(function () {
@@ -371,6 +373,23 @@ setTimeout(function () {
   check('the kernel value wins over the file',
     /301\.5/.test(afterKernel.statements[0].html), true);
 
+  // Moving the cursor about must not become a stream of kernel executions.
+  const probesBefore = probeCount;
+  captured.update(true);
+  captured.update(true);
+  captured.update(true);
+  setTimeout(function () {
+    check('repeated redraws reuse the answers rather than re-asking',
+      probeCount, probesBefore);
+    check('off by default for everyone else',
+      require('../package.json').contributes.configuration
+        .properties['prettyMath.jupyterValues'].default, false);
+    afterKernelTests();
+  }, 120);
+}, 200);
+
+function afterKernelTests() {
+
   // Back to a plain file for the remaining tests.
   extensionStubs['ms-toolsai.jupyter'] = undefined;
   vscodeStub.workspace.notebookDocuments = [];
@@ -380,7 +399,7 @@ setTimeout(function () {
   editor.selection = new Selection(new Position(line, 4), new Position(line, 4));
   vscodeStub.window.visibleTextEditors = [editor];
   pinTests();
-}, 200);
+}
 
 function pinTests() {
 

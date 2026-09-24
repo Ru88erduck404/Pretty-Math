@@ -100,8 +100,8 @@
         },
         "prettyMath.jupyterValues": {
           "type": "boolean",
-          "default": true,
-          "markdownDescription": "In a notebook, ask the running kernel what the variables hold, the way the Variables view does. Only applies while **Values** is on, and only where a kernel is already idle. Requires the Jupyter extension; without it, values still come from the cells above."
+          "default": false,
+          "markdownDescription": "In a notebook, ask the running kernel what the variables hold, the way the Variables view does. **Off by default**: the Jupyter extension will ask you to grant this extension permission to execute code against kernels, which is a broad permission for a narrow use, so it is opt-in. What gets sent is a single statement that prints the names currently holding a finite number and defines nothing. Only applies while **Values** is on, and only where a kernel is already idle. Without it, values still come from the cells above."
         },
         "prettyMath.valueDigits": {
           "type": "number",

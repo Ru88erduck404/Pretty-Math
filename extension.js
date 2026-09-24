@@ -16,6 +16,11 @@ const VALUE_LINES = 500;
 const MAX_LIVE_LOOKUPS = 40;
 // How long to wait for a debug adapter before giving up on live values.
 const LIVE_TIMEOUT_MS = 1500;
+// How long a kernel's answers are reused, and the floor on how often it may be
+// disturbed. Someone scrolling a notebook must not become a stream of kernel
+// executions.
+const KERNEL_TTL_MS = 2000;
+const KERNEL_MIN_GAP_MS = 750;
 
 function readConfig(doc) {
   const c = vscode.workspace.getConfiguration('prettyMath', doc ? doc.uri : null);
@@ -34,7 +39,7 @@ function readConfig(doc) {
     maxLines: c.get('maxLines', 40),
     substituteValues: c.get('substituteValues', false),
     valueDigits: c.get('valueDigits', 6),
-    jupyterValues: c.get('jupyterValues', true),
+    jupyterValues: c.get('jupyterValues', false),
     valueScanLines: VALUE_LINES
   };
 }
@@ -101,9 +106,9 @@ class PrettyMathView {
     this.liveKey = null;       // frame + names the cached answers belong to
     this.liveAnswers = null;
     this.livePending = null;   // a lookup already in flight for that key
-    this.kernelKey = null;     // the same, for a notebook kernel
-    this.kernelAnswers = null;
+    this.kernelCache = null;   // { book, at, asked, values } for a notebook
     this.kernelPending = null;
+    this.kernelProbedAt = 0;
     this.lastUri = null;       // the editor the last drawing came from
     this.decoration = vscode.window.createTextEditorDecorationType({
       backgroundColor: new vscode.ThemeColor('editor.selectionHighlightBackground'),
@@ -326,13 +331,35 @@ class PrettyMathView {
     });
     if (!wanted.length) return;
 
-    const key = cell.notebook.uri.toString() + '|' + wanted.join(',');
-    if (this.kernelKey === key && this.kernelAnswers) {
-      this.applyKernelValues(this.kernelAnswers, fileValues, run, cfg);
+    // Someone moving the cursor around a notebook must not turn into a stream
+    // of kernel executions. Answers are remembered per notebook for a couple of
+    // seconds, and a name already asked about is not asked again within that
+    // window even if it had no value. Between probes there is a floor on how
+    // often the kernel can be disturbed at all.
+    const book = cell.notebook.uri.toString();
+    const now = Date.now();
+    const cache = this.kernelCache;
+    const fresh = cache && cache.book === book && (now - cache.at) < KERNEL_TTL_MS;
+
+    if (fresh && wanted.every(function (n) { return cache.asked.indexOf(n) >= 0; })) {
+      this.applyKernelValues(cache.values, fileValues, run, cfg);
       return;
     }
-    if (this.kernelPending === key) return;
-    this.kernelPending = key;
+    if (this.kernelPending) return;
+    if (now - this.kernelProbedAt < KERNEL_MIN_GAP_MS) {
+      if (fresh) this.applyKernelValues(cache.values, fileValues, run, cfg);
+      return;
+    }
+
+    // Ask about everything still fresh as well, so the cache keeps growing
+    // rather than thrashing between two lines.
+    const ask = fresh
+      ? cache.asked.concat(wanted.filter(function (n) { return cache.asked.indexOf(n) < 0; }))
+          .slice(0, MAX_LIVE_LOOKUPS)
+      : wanted;
+
+    this.kernelPending = book;
+    this.kernelProbedAt = now;
 
     const token = ++this.liveToken;
     const source = new vscode.CancellationTokenSource();
@@ -346,15 +373,16 @@ class PrettyMathView {
       })
       .then((api) => {
         if (!api) return null;
-        return readKernelValues(api, cell.notebook.uri, wanted, { token: source.token });
+        return readKernelValues(api, cell.notebook.uri, ask, { token: source.token });
       })
       .then((numbers) => {
         clearTimeout(give_up);
         this.kernelPending = null;
+        // Remember what was asked even when nothing came back, so a notebook
+        // full of arrays is not re-probed on every keystroke.
+        this.kernelCache = { book: book, at: Date.now(), asked: ask, values: numbers || {} };
         if (!numbers || token !== this.liveToken) return;
         if (!this.view || !this.view.visible || this.pinned) return;
-        this.kernelKey = key;
-        this.kernelAnswers = numbers;
         this.applyKernelValues(numbers, fileValues, run, cfg);
       })
       .catch(() => {
@@ -529,8 +557,7 @@ function activate(context) {
   if (vscode.workspace.onDidChangeNotebookDocument) {
     context.subscriptions.push(
       vscode.workspace.onDidChangeNotebookDocument(function () {
-        provider.kernelKey = null;
-        provider.kernelAnswers = null;
+        provider.kernelCache = null;
         provider.schedule();
       })
     );

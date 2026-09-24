@@ -15,7 +15,12 @@ All notable changes to Pretty Math are recorded here. The format follows
   what lets `a0 = cn.value("Bohr radius")` show a number: no reading of the file
   can resolve a library lookup, but the kernel already knows. One short
   statement is sent, it defines nothing, and a busy kernel is left alone.
-  Turn it off with `prettyMath.jupyterValues`.
+  **Off by default** (`prettyMath.jupyterValues`): granting it means granting
+  the extension permission to execute code against kernels, which is a broad
+  permission for a narrow use, so it is opt-in.
+- Kernel answers are reused for two seconds and the kernel is disturbed at most
+  once every ¾ second, so moving the cursor around a notebook cannot turn into
+  a stream of kernel executions.
 
 ### Fixed
 
