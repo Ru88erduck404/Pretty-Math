@@ -4,7 +4,79 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
-## [0.1.7] — 2026-09-24
+## [0.1.3] — 2026-09-24
+
+Everything since 0.1.2. The numbers in between were local builds that were never
+released, so their notes are collected here.
+
+### Added
+
+- A **Values** button that draws what the variables are worth in place of their
+  names, and turns it off again. Off by default; the state lives in
+  `prettyMath.substituteValues`, and *Pretty Math: Toggle Variable Values* does
+  the same from the command palette.
+- Values come from a paused debug session when there is one — evaluated in the
+  frame you are stopped in, redrawn as you step, and marked with a dotted
+  underline — and otherwise from assignments above the cursor. Those are parsed
+  and constant-folded by a closed evaluator; no code from the file is ever run.
+- In a notebook, the cells above the current one are read as well, since a cell
+  is its own document and that is where the variables were defined.
+- Values from a running Jupyter kernel, shown as **Values · kernel**, which is
+  what lets a name assigned from a library lookup show a number. **Off by
+  default** (`prettyMath.jupyterValues`): it needs permission to execute code
+  against kernels, a broad permission for a narrow use. What gets sent is one
+  statement that prints the names currently holding a finite real number and
+  defines nothing. A busy kernel is left alone, answers are reused for two
+  seconds, and the kernel is disturbed at most once every ¾ second.
+- Constants a module owns, looked up through whatever the file called it: after
+  `from scipy import constants as cn`, `cn.bar` is 10⁵ and `cn.R` is the gas
+  constant. An unknown anywhere in a chain of assignments makes everything after
+  it unknown, so one such lookup was enough to leave a whole notebook blank.
+- Comprehensions: `sum(x**2 for x in values)` is drawn as Σ with `x ∈ values`
+  underneath, and the same for `prod`, `max`, `min`, `all` (∀) and `any` (∃). A
+  bare comprehension is drawn in set-builder form.
+- Lambdas and arrow functions as `x ↦ …`, and casts — C-style and Rust's `as` —
+  with the type kept as a quiet annotation.
+- **Alt+P** opens the panel, alongside Ctrl+Alt+M.
+- Identifiers may use any Unicode letter, so `længde` works; C++ and Rust scope
+  resolution (`std::sqrt`); `*args` and `**kwargs`.
+- Names that are assigned, bound by a comprehension or a lambda, or that are the
+  variable of a derivative or integral are left as names, since a value would be
+  wrong there. So are non-numeric values, and names defined in terms of
+  themselves — a loop update folded once would be precise and false.
+
+### Fixed
+
+- Bitwise operators are read per language. Python and Julia bind `&` tighter
+  than `==`; C and its descendants bind it looser, so `flags & 0xFF == 0` means
+  different things in each. Both were drawn the Python way. Comparisons chain
+  only where the language chains them, so `0 <= i < n` is drawn as `(0 <= i) < n`
+  in C and JavaScript.
+- Hexadecimal, binary and octal literals were truncated: `0xFF` drew as `0xF`.
+- `import`, `from`, `def` and `class` lines are ignored rather than reported as
+  parse errors, and string contents are kept — `value("Bohr radius")` was drawn
+  as `value("")`.
+- Tuple assignment parses, so `x, y = sp.symbols("x y")` is drawn.
+- `log(x)**2` drew the function as the literal word "undefined".
+- A qualifier that was not configured away is kept on a call, so
+  `pd.read_csv(path)` is no longer drawn as `read_csv(path)`.
+- `valueDigits` is honoured in exponential form; it was capped at five
+  significant digits.
+- The panel no longer empties itself when no editor is focused, which made
+  pressing a toolbar button in a notebook look like a crash.
+- A substituted value counts as a number when spacing a product, so
+  `0.5 * m * v**2` does not run its three numbers together.
+
+### Internal
+
+- Five test suites beyond the original two: a corpus of real source lines,
+  every library claim the README makes, hostile input, and seeded fuzzing that
+  draws half its cases with values plugged in. All six run in CI on Linux,
+  macOS and Windows.
+
+<!-- The notes below were never released; they are kept for the record. -->
+
+## [0.1.7 — unreleased]
 
 ### Fixed
 
@@ -35,7 +107,7 @@ All notable changes to Pretty Math are recorded here. The format follows
 - The fuzzer now draws half its cases with values plugged in, which is what
   found the `log(x)**2` bug.
 
-## [0.1.6] — 2026-09-24
+## [0.1.6 — unreleased]
 
 ### Added
 
@@ -47,7 +119,7 @@ All notable changes to Pretty Math are recorded here. The format follows
   downstream unknown, so a single `P = 1.013*cn.bar` was enough to leave `G`,
   `Gm` and `A` with no values at all.
 
-## [0.1.5] — 2026-09-24
+## [0.1.5 — unreleased]
 
 ### Added
 
@@ -75,7 +147,7 @@ All notable changes to Pretty Math are recorded here. The format follows
 - Module aliases are picked up from earlier notebook cells too, so an `import`
   in the first cell applies in the tenth.
 
-## [0.1.4] — 2026-09-23
+## [0.1.4 — unreleased]
 
 ### Fixed
 
@@ -96,7 +168,7 @@ All notable changes to Pretty Math are recorded here. The format follows
   1.5 seconds, so a slow or stuck debug adapter is not re-queried on every
   cursor move, nor waited on indefinitely.
 
-## [0.1.3] — 2026-09-23
+## [0.1.3 — unreleased, superseded above]
 
 ### Added
 
