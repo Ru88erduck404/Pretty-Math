@@ -27,8 +27,9 @@ function check(name, actual, expected) {
 }
 
 // The drawing, with the markup stripped: enough to tell notation apart.
-function drawn(src, lang, values) {
-  const cfg = values ? Object.assign({}, CFG, { values: values }) : CFG;
+function drawn(src, lang, values, override) {
+  const base = override || CFG;
+  const cfg = values ? Object.assign({}, base, { values: values }) : base;
   const st = analyze(src, { start: 0, end: 0 }, lang || 'python', cfg).statements[0];
   if (!st) return '(nothing)';
   if (st.error) return 'ERROR: ' + st.error.message;
@@ -164,6 +165,26 @@ check('self is dropped', drawn('e = self.mass * 2'), 'e=mass·2');
 const PANDAS = 'import pandas as pd\nrows = pd.read_csv(path)\n';
 check('an alias the file declares is learned',
   importModules(PANDAS).pd, 'pandas');
+
+// Only a maths module loses its qualifier. Drawing os.path.join as path.join,
+// or pd.read_csv as read_csv, would misrepresent where the call came from.
+const { mathAliases, isMathModule } = require('../src/values');
+check('numpy qualifies', isMathModule('numpy'), true);
+check('a scipy submodule qualifies', isMathModule('scipy.constants'), true);
+check('os does not', isMathModule('os'), false);
+check('pandas does not', isMathModule('pandas'), false);
+check('os is not dropped', mathAliases('import os\nimport numpy as np\n').join(','), 'np');
+check('pandas is not dropped',
+  mathAliases('import pandas as pd\nfrom scipy import constants as cn\n').join(','), 'cn');
+check('a relative import is not dropped',
+  mathAliases('from . import helpers\n').join(','), '');
+const OS_STRIP = Object.assign({}, CFG, {
+  stripNamespaces: STRIP.concat(mathAliases('import os\nimport pandas as pd\n'))
+});
+check('os keeps its qualifier in the drawing',
+  drawn('size = os.path.getsize(f)', 'python', null, OS_STRIP), 'size=os.path.getsize(f)');
+check('pandas keeps its qualifier too',
+  drawn('rows = pd.read_csv(p)', 'python', null, OS_STRIP), 'rows=pd.read_csv(p)');
 check('an unknown library call is still drawn, just as a call',
   drawn('rows = pd.read_csv(path)', 'python',
     null), 'rows=pd.read_csv(path)');

@@ -15,6 +15,13 @@ All notable changes to Pretty Math are recorded here. The format follows
   value, and anything the file assigns to that name wins over the table.
 - A plain import makes the module stand for itself, so `import numpy` knows
   `numpy.pi` exactly as `import numpy as np` knew `np.pi`.
+- Only a maths module loses its qualifier. Every module the file imported used
+  to be dropped from the drawing, which turned `os.path.getsize(f)` into
+  `path.getsize(f)` and `pd.read_csv(path)` into `read_csv(path)` —
+  misrepresenting where the call came from. `math`, `cmath`, `numpy`, `scipy`,
+  `sympy`, `torch`, `jax`, `cupy`, `mpmath`, `statistics` and their submodules
+  qualify; anything else keeps its name, and `prettyMath.stripNamespaces` still
+  decides the rest.
 
 ## [0.1.3] — 2026-09-24
 

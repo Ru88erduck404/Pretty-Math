@@ -2,7 +2,7 @@
 
 const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
-const { collectValues, valuesFromDebugger, importAliases } = require('./src/values');
+const { collectValues, valuesFromDebugger, mathAliases } = require('./src/values');
 const { formatNumber } = require('./src/evaluate');
 const { readKernelValues } = require('./src/jupyter');
 
@@ -255,9 +255,10 @@ class PrettyMathView {
       above = '';
     }
 
-    // `cn.R` reads as R after `from scipy import constants as cn`.
+    // `cn.R` reads as R after `from scipy import constants as cn`. Only maths
+    // modules qualify: dropping `os.` or `pd.` would misrepresent the call.
     try {
-      const aliases = importAliases(above).filter(function (a) {
+      const aliases = mathAliases(above).filter(function (a) {
         return cfg.stripNamespaces.indexOf(a) === -1;
       });
       if (aliases.length) cfg.stripNamespaces = cfg.stripNamespaces.concat(aliases);

@@ -192,9 +192,33 @@ function importAliases(text) {
   return Object.keys(importModules(text));
 }
 
+// Dropping a qualifier is only ever right for a module whose calls are maths.
+// `np.sqrt(x)` reads better as √x, but `os.path.join(a, b)` drawn as
+// `path.join(a, b)` is just a lie about where the call came from, and
+// `pd.read_csv` is no better. Everything outside this list keeps its name.
+const MATH_MODULES = new Set([
+  'math', 'cmath', 'numpy', 'scipy', 'sympy', 'torch', 'jax', 'cupy',
+  'mpmath', 'statistics', 'autograd', 'tensorflow', 'jnp', 'np', 'sp', 'sym'
+]);
+
+function isMathModule(name) {
+  return MATH_MODULES.has(String(name || '').split('.')[0]);
+}
+
+// The aliases worth dropping from a drawing: those, and only those, that stand
+// for a maths module.
+function mathAliases(text) {
+  const modules = importModules(text);
+  return Object.keys(modules).filter(function (alias) {
+    return isMathModule(modules[alias]);
+  });
+}
+
 module.exports = {
   collectValues: collectValues,
   valuesFromDebugger: valuesFromDebugger,
   importAliases: importAliases,
-  importModules: importModules
+  importModules: importModules,
+  mathAliases: mathAliases,
+  isMathModule: isMathModule
 };

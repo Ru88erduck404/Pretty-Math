@@ -122,9 +122,24 @@ The numbers come from one of three places, and the button says which:
 
 Constants a module owns are known too, looked up through whatever the file
 called the module. After `from scipy import constants as cn`, `cn.bar` is 10⁵
-and `cn.R` is the gas constant. That matters more than it sounds: an unknown
-anywhere in a chain makes everything downstream unknown, so one
-`P = 1.013*cn.bar` was once enough to leave every value after it blank.
+and `cn.R` is the gas constant, both where they are assigned and where they are
+used. That matters more than it sounds: an unknown anywhere in a chain makes
+everything downstream unknown, so one `P = 1.013*cn.bar` was once enough to
+leave every value after it blank.
+
+Only a variable of your own can override a constant: if the file assigns to that
+name, the file wins. And only the qualified spelling is recorded, so your own
+`R = 5` is never mistaken for the gas constant.
+
+### Which qualifiers get dropped
+
+`np.sqrt(x)` reads better as √x, so the qualifier goes. That is only ever right
+for a module whose calls are maths — `math`, `cmath`, `numpy`, `scipy`, `sympy`,
+`torch`, `jax`, `cupy`, `mpmath`, `statistics` and their submodules, plus
+whatever `prettyMath.stripNamespaces` lists. Everything else keeps its name:
+`os.path.getsize(f)` stays `os.path.getsize(f)`, and `pd.read_csv(path)` stays
+`pd.read_csv(path)`, because drawing those without the qualifier would
+misrepresent where the call came from.
 
 ### In notebooks
 
