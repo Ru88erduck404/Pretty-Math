@@ -124,10 +124,14 @@ function collectValues(text, languageId, config) {
     let m;
     while ((m = used.exec(text)) !== null) {
       const attr = m[1];
+      const key = alias + '.' + attr;
       if (!Object.prototype.hasOwnProperty.call(table, attr)) continue;
+      // Something the file assigned to that same name wins: the table is only
+      // what the module ships with.
+      if (Object.prototype.hasOwnProperty.call(out, key)) continue;
       const shown = formatNumber(table[attr], digits);
       if (shown === null) continue;
-      out[alias + '.' + attr] = { num: table[attr], text: shown, constant: true };
+      out[key] = { num: table[attr], text: shown, constant: true };
     }
   });
 

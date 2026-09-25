@@ -4,6 +4,18 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+
+- A module's constants are drawn where they appear, not only where they feed an
+  assignment. `cn.R * T` was drawn as `R · T` even with values on, which is the
+  one place the number is wanted; it now reads `8.31446 · T`. Only the qualified
+  spelling is recorded, so a variable of your own called `R` keeps its own
+  value, and anything the file assigns to that name wins over the table.
+- A plain import makes the module stand for itself, so `import numpy` knows
+  `numpy.pi` exactly as `import numpy as np` knew `np.pi`.
+
 ## [0.1.3] — 2026-09-24
 
 Everything since 0.1.2. The numbers in between were local builds that were never

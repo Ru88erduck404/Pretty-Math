@@ -144,6 +144,10 @@ check('a variable of your own called R keeps its own value',
   collectValues('R = 5\nx = R\n', 'python', CFG).R.text, '5');
 check('an unused constant is not recorded',
   useVals['cn.bar'], undefined);
+// Whatever the file says about a name beats what the module ships with.
+check('an assignment to the same name wins over the table',
+  collectValues('from scipy import constants as cn\ncn.R = 1\nx = cn.R\n',
+    'python', CFG)['cn.R'].text, '1');
 
 // ---- builtins and comprehensions ------------------------------------------
 check('sum over a comprehension', drawn('t = sum(x**2 for x in xs)'), 't=∑x∈xsx2');
