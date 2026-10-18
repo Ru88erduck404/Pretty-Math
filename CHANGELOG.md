@@ -4,6 +4,18 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.6] — 2026-10-18
+
+### Changed
+
+- The square root is one stroke. The sign used to be a √ from the font, scaled
+  to the radicand, with the rule over the radicand drawn separately as a
+  border; the two met at an angle that never quite closed, so a root read as a
+  sign and then a line. The sign is now drawn as a path that ends exactly where
+  the rule begins, at any height, with the stroke one weight throughout. It
+  also costs a measuring pass less, since the shape stretches with its own box
+  rather than being scaled to a measured one.
+
 ## [0.1.5] — 2026-10-18
 
 ### Added

@@ -179,16 +179,24 @@ body {
 
 .pm-sqrt {
   display: inline-flex;
-  align-items: flex-end;
+  align-items: stretch;
   vertical-align: middle;
   margin: 0 .1em;
   line-height: 1.2;
 }
+/* The sign stretches with the radicand because the box does: no measuring, and
+   nothing to re-run when the content changes. The stroke stays one weight at
+   any height, and sits half its own width lower so that its top edge lands on
+   the radicand's rule rather than straddling it. */
 .pm-radical {
-  display: inline-block;
-  line-height: 1;
-  transform-origin: center bottom;
-  padding-right: .02em;
+  align-self: stretch;
+  width: .62em;
+  min-width: .62em;
+  height: auto;
+  overflow: visible;
+  stroke: currentColor;
+  stroke-width: var(--pm-rule);
+  transform: translateY(calc(var(--pm-rule) / 2));
 }
 .pm-radicand {
   border-top: var(--pm-rule) solid currentColor;

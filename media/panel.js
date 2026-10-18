@@ -39,13 +39,8 @@
       });
     });
 
-    const roots = Array.prototype.slice.call(root.querySelectorAll('.pm-sqrt')).reverse();
-    roots.forEach(function (sq) {
-      const radicand = sq.querySelector(':scope > .pm-radicand');
-      const radical = sq.querySelector(':scope > .pm-radical');
-      if (!radicand || !radical) return;
-      stretch(radical, radicand.getBoundingClientRect().height * 0.98, 1.05);
-    });
+    // Radicals need no pass of their own: the sign is an SVG that stretches
+    // with its own box, so it is already the height of the radicand.
 
     // Integral signs grow to the integrand, and the sign's box has to grow with
     // them so the limits still sit at its head and foot.

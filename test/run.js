@@ -177,7 +177,10 @@ function withValues(src, file, lang) {
 }
 
 function plainText(html) {
-  return html.replace(/<[^>]*>/g, '');
+  // The radical is drawn as an SVG; put the sign back so that an expectation
+  // below still reads the way the panel does.
+  return html.replace(/<svg class="pm-radical"[\s\S]*?<\/svg>/g, '√')
+    .replace(/<[^>]*>/g, '');
 }
 
 const FILE = [

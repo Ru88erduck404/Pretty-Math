@@ -45,6 +45,12 @@ const SAMPLES = [
   ['javascript', 'const mid = lo + (hi - lo) / 2;'],
   ['python', 'y = a + * b'],
 
+  ['python', 'r = math.sqrt(x)'],
+  ['python', 'r = math.sqrt(a + b) + math.sqrt(x/y) + math.sqrt(1 + n**2)'],
+  ['python', 'r = math.sqrt((a + b) / (c * d) + 1/e)'],
+  ['python', 'r = math.sqrt(math.sqrt(math.sqrt(x)))'],
+  ['python', 'r = x**(1/3) + math.sqrt(y)'],
+
   ['python', 'M = sp.Matrix([[1, 2], [3, 4]])'],
   ['python', 'A = np.array([[a, b, c], [d, e, f], [g, h, i]])'],
   ['python', 'J = sp.Matrix([[sp.diff(f, x), sp.diff(f, y)], [sp.diff(g, x), sp.diff(g, y)]])'],

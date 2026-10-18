@@ -248,11 +248,22 @@ function makeRenderer(opts) {
       node, ATOM, true);
   }
 
+  // The radical is drawn rather than typed. A √ from the font is a fixed shape
+  // that has to be scaled to the radicand and then meet a separate rule along
+  // the top, and the two never quite join. This path ends at the top right of
+  // its own box, exactly where the radicand's rule begins, so the sign and the
+  // bar read as one stroke at any height.
+  const RADICAL =
+    '<svg class="pm-radical" viewBox="0 0 60 100" preserveAspectRatio="none" ' +
+    'aria-hidden="true" focusable="false">' +
+    '<path d="M1 57 L15 48 L31 94 L55 0 L60 0" fill="none" ' +
+    'vector-effect="non-scaling-stroke" stroke-linecap="butt" ' +
+    'stroke-linejoin="miter"/></svg>';
+
   function sqrt(inner, node, index) {
     const idx = index ? '<span class="pm-root-index">' + esc(index) + '</span>' : '';
     return box('pm-sqrt',
-      idx + '<span class="pm-radical">√</span>' +
-      '<span class="pm-radicand">' + inner + '</span>',
+      idx + RADICAL + '<span class="pm-radicand">' + inner + '</span>',
       node, ATOM, true);
   }
 

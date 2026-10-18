@@ -35,7 +35,8 @@ function drawn(src, lang, values, override) {
   if (st.error) return 'ERROR: ' + st.error.message;
   // The markup goes, and the entities come back to the characters they stand
   // for, so an expectation below reads the way the panel does.
-  return st.html.replace(/<[^>]*>/g, '')
+  return st.html.replace(/<svg class="pm-radical"[\s\S]*?<\/svg>/g, '√')
+    .replace(/<[^>]*>/g, '')
     .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
@@ -208,6 +209,34 @@ check('both halves of a tuple assignment still draw',
   drawn('a, b = f.subs({"T": T}), g.subs({"T": T})'),
   'a,b=f.subs({"T":T}),g.subs({"T":T})');
 check('a mapping yields no value', collectValues('d = {"a": 1}\n', 'python', CFG).d, undefined);
+
+// ---- the radical -----------------------------------------------------------
+// Drawn as one path, so the sign and the rule over the radicand cannot drift
+// apart. Nothing measures it, so there is no pass to go stale.
+check('the radical is drawn, not typed', (function () {
+  const st = analyze('y = math.sqrt(x)', { start: 0, end: 0 }, 'python', CFG).statements[0];
+  return /<svg class="pm-radical"[^>]*viewBox/.test(st.html) && !/√/.test(st.html);
+})(), true);
+check('and it ends at the top of its own box, where the rule starts', (function () {
+  const st = analyze('y = math.sqrt(x)', { start: 0, end: 0 }, 'python', CFG).statements[0];
+  const d = /<path d="([^"]+)"/.exec(st.html);
+  return d && / L60 0"?$/.test(d[1]);
+})(), true);
+check('a root still reports itself as tall', (function () {
+  const st = analyze('y = math.sqrt(x)', { start: 0, end: 0 }, 'python', CFG).statements[0];
+  return /pm-sqrt/.test(st.html);
+})(), true);
+check('a cube root keeps its index', drawn('y = x**(1/3)'), 'y=3√x');
+check('nested roots', drawn('y = math.sqrt(math.sqrt(x))'), 'y=√√x');
+
+// ---- several expressions on one line ---------------------------------------
+check('a tuple assignment draws both sides',
+  drawn('a, b = 1/x, 2/y'), 'a,b=1x,2y');
+check('three of them', drawn('a, b, c = f, g, h/2'), 'a,b,c=f,g,h2');
+check('a swap', drawn('a, b = b, a'), 'a,b=b,a');
+check('a tuple of substitutions, which is where this came up',
+  drawn('x1, x2 = (0.002/10**(A - B/(T + C))).subs({"T": T}), (0.998/10**(D - E/(T + F))).subs({"T": T})'),
+  'x1,x2=0.00210A−BT+C.subs({"T":T}),0.99810D−ET+F.subs({"T":T})');
 
 // ---- matrices --------------------------------------------------------------
 // The grid loses the commas and the nesting: the brackets are the notation.
