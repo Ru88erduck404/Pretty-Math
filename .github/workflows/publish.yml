@@ -3,27 +3,47 @@ name: Publish
 # Pushing a version tag releases that version. A plain push to main does not,
 # so day-to-day commits never reach anyone's editor by accident.
 #
-#   npm version patch   (or edit "version" in package.json by hand)
 #   git push origin main --follow-tags
 #
-# Requires a repository secret VSCE_PAT holding an Azure DevOps personal access
-# token with the Marketplace > Manage scope. OVSX_PAT is optional and only used
-# if it is set, for publishing to Open VSX as well (that is what VSCodium uses).
+# Publishing to the Marketplace authenticates with Microsoft Entra ID over
+# GitHub's OIDC, so there is no token to store or rotate: GitHub proves who it
+# is to Microsoft at the moment of the run. The personal access tokens that
+# used to do this job are retired on 1 December 2026.
+#
+# Two repository variables are needed, neither of them a secret, because an
+# identity on its own grants nothing -- it only names who GitHub claims to be,
+# and Entra will only believe it for this repository's "release" environment:
+#
+#   AZURE_CLIENT_ID   the managed identity or app registration
+#   AZURE_TENANT_ID   the directory it lives in
+#
+# Set them under Settings > Secrets and variables > Actions > Variables, and
+# create the "release" environment under Settings > Environments. The identity
+# also has to be a Contributor on the Marketplace publisher; see RELEASING.md.
+#
+# OVSX_PAT is unrelated and optional: Open VSX is run by the Eclipse
+# Foundation, keeps its own tokens, and is what VSCodium installs from.
 
 on:
   push:
     tags: ['v*']
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Check publish rights without publishing anything'
+        type: boolean
+        default: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
-    # Needed to create the GitHub release; new repositories give workflows
-    # read-only access by default.
+    # The federated credential in Entra is bound to this environment, so a run
+    # from anywhere else cannot borrow the identity.
+    environment: release
     permissions:
-      contents: write
+      contents: write   # to create the GitHub release
+      id-token: write   # to request the OIDC token Entra checks
     env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
       - uses: actions/checkout@v4
@@ -42,6 +62,7 @@ jobs:
           node test/fuzz.js
 
       - name: Check the tag matches the version in package.json
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           tag="${GITHUB_REF_NAME#v}"
           manifest="$(node -p "require('./package.json').version")"
@@ -54,16 +75,40 @@ jobs:
       - name: Build the .vsix
         run: npx --yes @vscode/vsce package --no-dependencies --out pretty-math.vsix
 
+      - name: Sign in to Microsoft Entra ID
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          # Publishing touches no Azure resources, so the identity needs no
+          # subscription and the login must be told not to look for one.
+          allow-no-subscriptions: true
+
+      # Signing in only proves GitHub can authenticate as the identity. Whether
+      # that identity may publish is a separate grant on the publisher, so it is
+      # worth failing here rather than halfway through a release.
+      - name: Check the identity may publish
+        run: npx --yes @vscode/vsce verify-pat --azure-credential ru88erduck404
+
+      - name: Show the identity's Marketplace id
+        if: inputs.dry_run
+        run: |
+          echo "Add this id to the publisher as a Contributor:"
+          az rest --method get --resource 499b84ac-1321-427f-aa17-267ca6975798 \
+            --url "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=6.0" \
+            --query id -o tsv
+
       - name: Attach the .vsix to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
         uses: softprops/action-gh-release@v2
         with:
           files: pretty-math.vsix
           generate_release_notes: true
 
       - name: Publish to the Visual Studio Marketplace
-        if: env.VSCE_PAT != ''
-        run: npx --yes @vscode/vsce publish --no-dependencies --packagePath pretty-math.vsix
+        if: ${{ !inputs.dry_run }}
+        run: npx --yes @vscode/vsce publish --azure-credential --packagePath pretty-math.vsix
 
       - name: Publish to Open VSX
-        if: env.OVSX_PAT != ''
+        if: ${{ env.OVSX_PAT != '' && !inputs.dry_run }}
         run: npx --yes ovsx publish pretty-math.vsix --pat "$OVSX_PAT"
