@@ -270,11 +270,11 @@ class Parser {
     return this.node('Comprehension', { body: body, clauses: clauses }, body.s, end);
   }
 
-  parseArgs(closer, allowSlice) {
+  parseArgs(closer, allowSlice, allowPairs) {
     const args = [];
     if (this.atOp(closer)) return args;
     for (;;) {
-      args.push(this.parseArgItem(allowSlice));
+      args.push(this.parseArgItem(allowSlice, allowPairs));
       if (args.length === 1 && this.atFor()) {
         args[0] = this.parseComprehension(args[0]);
         break;
@@ -288,7 +288,7 @@ class Parser {
     return args;
   }
 
-  parseArgItem(allowSlice) {
+  parseArgItem(allowSlice, allowPairs) {
     if (allowSlice && this.atOp(':')) return this.parseSlice(null, this.peek().s);
     // Python's *args / **kwargs, and JavaScript's ...rest
     if (this.atOp('*') || this.atOp('**')) {
@@ -306,6 +306,13 @@ class Parser {
     }
     const first = this.parseExpr(0);
     if (allowSlice && this.atOp(':')) return this.parseSlice(first, first.s);
+    // Inside braces a colon pairs a key with a value: a dict, or the mapping a
+    // sympy `.subs({"T": T})` is given. Any expression may be the key.
+    if (allowPairs && this.atOp(':')) {
+      this.next();
+      const value = this.parseExpr(0);
+      return this.node('Pair', { key: first, value: value }, first.s, value.e);
+    }
     return first;
   }
 
@@ -385,7 +392,7 @@ class Parser {
     if (t.t === 'op' && (t.v === '(' || t.v === '[' || t.v === '{')) {
       const closer = t.v === '(' ? ')' : t.v === '[' ? ']' : '}';
       this.next();
-      const items = this.parseArgs(closer, false);
+      const items = this.parseArgs(closer, false, t.v === '{');
       const close = this.peek();
       this.expect(closer);
       if (t.v === '(' && items.length === 1 && items[0].type !== 'KeyVal') {

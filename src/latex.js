@@ -2,6 +2,7 @@
 
 const S = require('./symbols');
 const { PREC, dottedName } = require('./parser');
+const { isMatrix } = require('./render');
 
 const ATOM = 100;
 const POWER = 26;
@@ -229,6 +230,12 @@ function toLatex(node, opts) {
     const owner = (n.callee.type === 'Member' && name !== null && name.indexOf('.') >= 0)
       ? n.callee.obj : null;
 
+    // Matrix([[a, b], [c, d]]) is the grid and nothing more, as in the drawing.
+    if (last && name.indexOf('.') < 0 && S.MATRIX_MAKERS.has(last) &&
+        a.length === 1 && isMatrix(positional[0])) {
+      return go(positional[0]);
+    }
+
     if (last && positional.length === 1 && positional[0].type === 'Comprehension' &&
         COMPREHENSION_OPS[last]) {
       const comp = positional[0];
@@ -452,7 +459,15 @@ function toLatex(node, opts) {
           ' ' + go(n.r).tex, 1);
       case 'KeyVal':
         return res('\\mathrm{' + n.name + '} = ' + go(n.value).tex, 1);
+      case 'Pair':
+        return res(go(n.key).tex + ' : ' + go(n.value).tex, 1);
       case 'List': {
+        if (isMatrix(n)) {
+          const rows = n.items.map(function (row) {
+            return row.items.map(function (c) { return go(c).tex; }).join(' & ');
+          }).join(' \\\\ ');
+          return res('\\begin{bmatrix} ' + rows + ' \\end{bmatrix}');
+        }
         const inner = n.items.map(function (x) { return go(x).tex; }).join(', ');
         if (n.kind === ',') return res(inner, 2);
         const open = n.kind === '(' ? '(' : n.kind === '[' ? '[' : '\\{';

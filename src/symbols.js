@@ -116,6 +116,13 @@ const FUNCTIONS = {
 // numpy.diff is a discrete difference, not a derivative, so it is drawn as one.
 const DISCRETE_NAMESPACES = new Set(['np', 'numpy', 'jnp', 'cupy', 'torch', 'pd', 'pandas']);
 
+// Calls that only wrap a literal grid: the brackets already say "matrix", so
+// the name around them adds nothing to the drawing.
+const MATRIX_MAKERS = new Set([
+  'Matrix', 'matrix', 'ImmutableMatrix', 'MutableMatrix', 'DenseMatrix',
+  'array', 'asarray', 'asanyarray', 'ndarray', 'tensor', 'Tensor', 'mat'
+]);
+
 // Upright function names drawn without parentheses around a simple argument.
 const BARE_NAMES = [
   'sin', 'cos', 'tan', 'cot', 'sec', 'csc',
@@ -180,6 +187,7 @@ module.exports = {
   CONSTANTS: CONSTANTS,
   FUNCTIONS: FUNCTIONS,
   DISCRETE_NAMESPACES: DISCRETE_NAMESPACES,
+  MATRIX_MAKERS: MATRIX_MAKERS,
   POWERABLE: POWERABLE,
   OPS: OPS,
   OPS_TEX: OPS_TEX

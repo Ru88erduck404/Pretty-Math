@@ -21,6 +21,24 @@ const ARITHMETIC = new Set(['+', '-', '*', '/', '%', '//', '**']);
 const BITWISE = new Set(['&', '|', 'xor', '<<', '>>', '>>>']);
 const COMPARE = new Set(['==', '!=', '===', '!==', '<', '>', '<=', '>=']);
 
+// A plain row: a bracketed list holding nothing that brackets alone cannot say
+// -- no slices, no keywords, no comprehension, no spread, no key/value pair.
+function isRow(node) {
+  return !!node && node.type === 'List' && node.kind === '[' &&
+    node.items.length > 0 && node.items.every(function (i) {
+      return i && i.type !== 'Slice' && i.type !== 'KeyVal' &&
+        i.type !== 'Spread' && i.type !== 'Comprehension' && i.type !== 'Pair';
+    });
+}
+
+// A list whose every item is a row is a matrix, and far easier to read as a grid
+// than as nested brackets. Rows of unequal length stay unequal in the drawing:
+// that is a mistake worth seeing, not one worth hiding.
+function isMatrix(node) {
+  return !!node && node.type === 'List' && node.kind === '[' &&
+    node.items.length > 0 && node.items.every(isRow);
+}
+
 function murkyMix(parentOp, child, chains) {
   if (!child || child.type !== 'Binary') return false;
   const c = child.op;
@@ -138,6 +156,25 @@ function makeRenderer(opts) {
       '<span class="pm-fence">' + esc(open) + '</span>' +
       '<span class="pm-body">' + inner + '</span>' +
       '<span class="pm-fence">' + esc(close) + '</span></span>';
+  }
+
+  // ---------------------------------------------------------------- matrices
+
+  function renderMatrix(node) {
+    // Laid out as a CSS table rather than a grid: the columns line up without
+    // the markup having to carry a count, which the panel's CSP would block as
+    // an inline style. Short rows simply end early, so a ragged matrix looks
+    // ragged.
+    const rows = node.items.map(function (row) {
+      const cells = row.items.map(function (cell) {
+        return '<span class="pm-cell">' + render(cell).html + '</span>';
+      });
+      return '<span class="pm-mrow">' + cells.join('') + '</span>';
+    });
+    const grid = '<span class="pm-matrix-grid">' + rows.join('') + '</span>';
+    return box('pm-matrix',
+      '<span class="pm-fence pm-mbracket">[</span>' + grid +
+      '<span class="pm-fence pm-mbracket">]</span>', node, ATOM, true);
   }
 
   function op(glyph, cls) {
@@ -513,6 +550,13 @@ function makeRenderer(opts) {
     // expr.diff(x) / y.integrate(x): the receiver is the expression itself.
     const owner = (node.callee.type === 'Member' && name !== null && name.indexOf('.') >= 0)
       ? node.callee.obj : null;
+
+    // Matrix([[a, b], [c, d]]) is the grid and nothing more. The name is only
+    // dropped when its qualifier was dropped too, so pd.array stays pd.array.
+    if (last && name.indexOf('.') < 0 && S.MATRIX_MAKERS.has(last) &&
+        args.length === 1 && isMatrix(positional[0])) {
+      return renderMatrix(positional[0]);
+    }
 
     // sum / prod / all / any / max / min over a comprehension
     if (last && positional.length === 1 && positional[0].type === 'Comprehension') {
@@ -993,7 +1037,16 @@ function makeRenderer(opts) {
           node, 1, v.tall);
       }
 
+      case 'Pair': {
+        const k = render(node.key);
+        const v = render(node.value);
+        return box('pm-pair',
+          k.html + '<span class="pm-punct">:</span><span class="pm-gap"></span>' + v.html,
+          node, 1, k.tall || v.tall);
+      }
+
       case 'List': {
+        if (isMatrix(node) && node.kind === '[') return renderMatrix(node);
         const parts = node.items.map(function (i) { return render(i); });
         const tall = parts.some(function (p) { return p.tall; });
         const inner = parts.map(function (p) { return p.html; })
@@ -1033,6 +1086,7 @@ function treeText(node, indent) {
     case 'Ternary': label = 'conditional'; kids.push(node.cond, node.then, node.other); break;
     case 'List': label = 'list ' + node.kind; node.items.forEach(function (a) { kids.push(a); }); break;
     case 'KeyVal': label = 'argument ' + node.name; kids.push(node.value); break;
+    case 'Pair': label = 'key and value'; kids.push(node.key, node.value); break;
     case 'Transpose': label = 'transpose'; kids.push(node.arg); break;
     case 'Spread': label = 'spread ' + node.op; kids.push(node.arg); break;
     case 'Cast': label = 'cast ' + node.name; kids.push(node.arg); break;
@@ -1058,4 +1112,9 @@ function treeText(node, indent) {
   return out;
 }
 
-module.exports = { makeRenderer: makeRenderer, treeText: treeText, esc: esc };
+module.exports = {
+  makeRenderer: makeRenderer,
+  treeText: treeText,
+  esc: esc,
+  isMatrix: isMatrix
+};

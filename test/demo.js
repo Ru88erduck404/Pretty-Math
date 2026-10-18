@@ -45,6 +45,16 @@ const SAMPLES = [
   ['javascript', 'const mid = lo + (hi - lo) / 2;'],
   ['python', 'y = a + * b'],
 
+  ['python', 'M = sp.Matrix([[1, 2], [3, 4]])'],
+  ['python', 'A = np.array([[a, b, c], [d, e, f], [g, h, i]])'],
+  ['python', 'J = sp.Matrix([[sp.diff(f, x), sp.diff(f, y)], [sp.diff(g, x), sp.diff(g, y)]])'],
+  ['python', 'K = sp.Matrix([[1/(a + b), sp.sqrt(c)], [x**2, 0]])'],
+  ['python', 'col = sp.Matrix([[1], [2], [3]])'],
+  ['python', 'ragged = [[1, 2, 3], [4, 5]]'],
+  ['python', 'kept = pd.array([[1, 2], [3, 4]])'],
+  ['python', 'x_phenol = (0.002 / 10**(pheA - pheB / (T + pheC))).subs({"T": T})'],
+  ['python', 'sol = expr.subs({x: 2, y: n / 3})'],
+
   ['python', 'dydx = sp.diff(y, x)'],
   ['python', 'a = sp.diff(x**2 * sp.sin(x), x)'],
   ['python', 'acc = sp.diff(position, t, 2)'],

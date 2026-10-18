@@ -219,6 +219,35 @@ body {
 }
 .pm-fenced-tall > .pm-body { padding: 0 .08em; }
 
+/* ----------------------------------------------------------------- matrices */
+
+.pm-matrix {
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+.pm-matrix > .pm-mbracket {
+  display: inline-block;
+  line-height: 1;
+  transform-origin: center center;
+}
+.pm-matrix-grid {
+  display: inline-table;
+  border-collapse: collapse;
+  padding: 0 .2em;
+  /* The panel's roomy line-height is there so fractions can breathe; inside a
+     grid it only pushes the rows apart. Anything tall in a cell -- a fraction,
+     a root -- still carries its own height. */
+  line-height: 1.25;
+}
+.pm-mrow { display: table-row; }
+.pm-cell {
+  display: table-cell;
+  text-align: center;
+  vertical-align: middle;
+  padding: .09em .35em;
+}
+
 /* -------------------------------------------------------------- other boxes */
 
 .pm-stack {

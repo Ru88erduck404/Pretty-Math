@@ -59,6 +59,31 @@ function expr(depth, lang) {
     return py ? expr(depth - 1, lang) + ' if ' + expr(0, lang) + ' else ' + expr(depth - 1, lang)
       : expr(0, lang) + ' ? ' + expr(depth - 1, lang) + ' : ' + expr(depth - 1, lang);
   }
+  // A grid, sometimes ragged, sometimes behind a maker, sometimes behind one
+  // whose name has to survive.
+  if (roll < 0.90) {
+    const rows = [];
+    const n = 1 + Math.floor(rnd() * 3);
+    for (let r = 0; r < n; r++) {
+      const cells = [];
+      const w = 1 + Math.floor(rnd() * 3);
+      for (let c = 0; c < w; c++) cells.push(expr(depth - 1, lang));
+      rows.push('[' + cells.join(', ') + ']');
+    }
+    const grid = '[' + rows.join(', ') + ']';
+    return chance(0.5) ? grid : pick(['sp.Matrix', 'np.array', 'pd.array', 'foo']) +
+      '(' + grid + (chance(0.25) ? ', dtype=float' : '') + ')';
+  }
+  // A mapping, as sympy's .subs is given one.
+  if (roll < 0.92) {
+    const pairs = [];
+    const n = 1 + Math.floor(rnd() * 3);
+    for (let k = 0; k < n; k++) {
+      pairs.push(pick(['"T"', "'x'", pick(NAMES)]) + ': ' + expr(depth - 1, lang));
+    }
+    const dict = '{' + pairs.join(', ') + '}';
+    return chance(0.5) ? dict : expr(depth - 1, lang) + '.subs(' + dict + ')';
+  }
   if (!py) return expr(depth - 1, lang) + ' ' + pick(ops) + ' ' + expr(depth - 1, lang);
   if (roll < 0.94) {
     return 'sum(' + expr(depth - 1, lang) + ' for ' + pick(['i', 'x']) + ' in ' + pick(NAMES) + ')';

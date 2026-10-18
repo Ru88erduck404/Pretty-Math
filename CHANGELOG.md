@@ -4,6 +4,25 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.1.5] — 2026-10-18
+
+### Added
+
+- Matrices are drawn as grids inside stretched brackets. `sp.Matrix([[1, 2],
+  [3, 4]])`, `np.array(...)` and a bare list of lists all read as the matrix
+  they are, with each cell free to hold a fraction, a root or a derivative.
+  The maker's name is dropped only when its qualifier would be — `pd.array`
+  keeps its name, and so does a function of your own — and an extra argument
+  such as `dtype=float` keeps the call. Rows of unequal length stay unequal in
+  the drawing, since that is a mistake worth seeing.
+
+### Fixed
+
+- Dict and set literals are read. A colon inside braces had no meaning, so
+  `expr.subs({"T": T})` failed to parse — and because one bad expression stops
+  the statement, everything else on the line went with it. A sympy
+  substitution now draws, and so does the formula it is applied to.
+
 ## [0.1.4] — 2026-09-25
 
 ### Fixed

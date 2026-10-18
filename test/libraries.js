@@ -33,7 +33,11 @@ function drawn(src, lang, values, override) {
   const st = analyze(src, { start: 0, end: 0 }, lang || 'python', cfg).statements[0];
   if (!st) return '(nothing)';
   if (st.error) return 'ERROR: ' + st.error.message;
-  return st.html.replace(/<[^>]*>/g, '');
+  // The markup goes, and the entities come back to the characters they stand
+  // for, so an expectation below reads the way the panel does.
+  return st.html.replace(/<[^>]*>/g, '')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>').replace(/&amp;/g, '&');
 }
 
 // ---- math and cmath --------------------------------------------------------
@@ -188,6 +192,49 @@ check('pandas keeps its qualifier too',
 check('an unknown library call is still drawn, just as a call',
   drawn('rows = pd.read_csv(path)', 'python',
     null), 'rows=pd.read_csv(path)');
+
+// ---- dicts, and the mappings sympy is given -------------------------------
+// A `.subs({"T": T})` used to refuse the whole statement, and with it every
+// expression on the line, because the colon inside the braces had no meaning.
+check('a dict literal', drawn('d = {"a": 1, "b": 2}'), 'd={"a":1,"b":2}');
+check('a set literal', drawn('s = {1, 2, 3}'), 's={1,2,3}');
+check('an empty dict', drawn('e = {}'), 'e={}');
+check('a dict comprehension', drawn('q = {k: v**2 for k in xs}'), /k:v2∣/);
+check('a subs mapping', drawn('y = expr.subs({"T": T})'), 'y=expr.subs({"T":T})');
+check('a mapping does not stop the formula around it',
+  drawn('x = (0.002/10**(A - B/(T + C))).subs({"T": T})'),
+  'x=0.00210A−BT+C.subs({"T":T})');
+check('both halves of a tuple assignment still draw',
+  drawn('a, b = f.subs({"T": T}), g.subs({"T": T})'),
+  'a,b=f.subs({"T":T}),g.subs({"T":T})');
+check('a mapping yields no value', collectValues('d = {"a": 1}\n', 'python', CFG).d, undefined);
+
+// ---- matrices --------------------------------------------------------------
+// The grid loses the commas and the nesting: the brackets are the notation.
+check('sp.Matrix is a grid', drawn('M = sp.Matrix([[1, 2], [3, 4]])'), 'M=[1234]');
+check('np.array is a grid', drawn('A = np.array([[1, 2], [3, 4]])'), 'A=[1234]');
+check('a bare list of lists is a grid', drawn('B = [[a, b], [c, d]]'), 'B=[abcd]');
+check('a column vector', drawn('c = sp.Matrix([[1], [2], [3]])'), 'c=[123]');
+check('cells keep their own notation',
+  drawn('z = sp.Matrix([[1/(a+b), sp.sqrt(c)]])'), 'z=[1a+b√c]');
+// Dropping the name would misreport the call, so only a maths maker loses it.
+check('an unknown maker keeps its name',
+  drawn('f = foo([[1, 2], [3, 4]])'), 'f=foo([1234])');
+check('a kept qualifier keeps the name too',
+  drawn('x = pd.array([[1, 2], [3, 4]])', 'python', null, OS_STRIP),
+  'x=pd.array([1234])');
+check('extra arguments keep the call',
+  drawn('y = np.array([[1, 2]], dtype=float)'), 'y=array([12],dtype=float)');
+check('a flat list is not a grid, so the shape stays visible',
+  drawn('v = np.array([1, 2, 3])'), 'v=array([1,2,3])');
+check('a mixed list is not a grid', drawn('L = [[1, 2], 3]'), 'L=[[1,2],3]');
+check('a row that is really a comprehension is not a grid',
+  drawn('S = [[x for x in xs], [b]]'), /∈/);
+check('the latex of a grid is a bmatrix', (function () {
+  const { toLatex } = require('../src/latex');
+  const { parse } = require('../src/parser');
+  return toLatex(parse('M = sp.Matrix([[1, 2], [3, 4]])', {}), CFG);
+})(), /\\begin\{bmatrix\} 1 & 2 \\\\ 3 & 4 \\end\{bmatrix\}/);
 
 // ---- what deliberately yields no value ------------------------------------
 const NOVALUE = [

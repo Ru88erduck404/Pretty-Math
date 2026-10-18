@@ -63,6 +63,18 @@
       });
     });
 
+    // Matrix brackets grow to the grid, innermost first so a nested grid has
+    // already settled by the time the one around it is measured.
+    const matrices = Array.prototype.slice.call(root.querySelectorAll('.pm-matrix')).reverse();
+    matrices.forEach(function (m) {
+      const grid = m.querySelector(':scope > .pm-matrix-grid');
+      if (!grid) return;
+      const h = grid.getBoundingClientRect().height;
+      m.querySelectorAll(':scope > .pm-mbracket').forEach(function (b) {
+        stretch(b, h * 0.98, 1.05);
+      });
+    });
+
     const braces = Array.prototype.slice.call(root.querySelectorAll('.pm-cases')).reverse();
     braces.forEach(function (c) {
       const grid = c.querySelector(':scope > .pm-cases-grid');

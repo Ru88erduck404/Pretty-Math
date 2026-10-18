@@ -68,13 +68,16 @@ const RENDERS = [
   ['matlab', 'y = (a.^2 + b.^2).^0.5;'],
   ['matlab', "z = A' * B;"],
   ['julia', 'y = sqrt(a^2 + b^2)'],
-  ['r', 'y <- mean(x) / sd(x)']
+  ['r', 'y <- mean(x) / sd(x)'],
+  ['python', 'd = {"a": 1, "b": 2}'],
+  ['python', 'y = expr.subs({"T": T})'],
+  ['python', 'M = sp.Matrix([[1, 2], [3, 4]])'],
+  ['python', 'A = np.array([[a, b], [c, d]])']
 ];
 
 // Known gaps, kept explicit rather than silently failing.
 const REFUSES = [
   ['python', 'label = f"value is {x:.2f}"'],         // f-strings
-  ['python', 'd = {"a": 1, "b": 2}'],                // dict literals
   ['python', 'if (n := len(values)) > 10:'],         // walrus inside parens
   ['python', 'x = '],                                // genuinely incomplete
   ['python', 'x = 1 +'],
