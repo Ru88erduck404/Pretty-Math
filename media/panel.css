@@ -22,13 +22,18 @@ body {
   z-index: 5;
   display: flex;
   align-items: center;
+  /* The panel is often a narrow strip at the foot of the window, and there are
+     more buttons than fit in one. They wrap onto a second line rather than
+     being pushed out of sight: a button you cannot reach is a feature you do
+     not have. */
+  flex-wrap: wrap;
   gap: 6px;
   padding: 5px 10px;
   background: var(--vscode-panel-background, var(--vscode-editor-background));
   border-bottom: 1px solid var(--vscode-panel-border, transparent);
 }
 
-#bar .spacer { flex: 1; }
+#bar .spacer { flex: 1 1 auto; min-width: 0; }
 
 #where {
   color: var(--vscode-descriptionForeground);
@@ -36,6 +41,9 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* Gives up its space first: the file name is the least of what is here. */
+  flex: 0 1 auto;
+  min-width: 0;
 }
 
 #bar button {
@@ -44,6 +52,10 @@ body {
   padding: 2px 8px;
   font-family: inherit;
   font-size: 11px;
+  /* A label stays on one line and at its own width, so that "Values · file"
+     does not become two lines of "Values" and "· file". */
+  white-space: nowrap;
+  flex: 0 0 auto;
   color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
   background: var(--vscode-button-secondaryBackground, transparent);
   cursor: pointer;

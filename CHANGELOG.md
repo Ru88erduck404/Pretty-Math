@@ -4,6 +4,17 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.3] — 2026-10-19
+
+### Fixed
+
+- The buttons wrap onto a second row instead of being pushed out of sight. The
+  panel is usually a narrow strip at the foot of the window, and there are now
+  more buttons than fit across one: at the widths a laptop actually gives it,
+  **Pin** was cut in half and **Copy** and **Pin** disappeared altogether, with
+  no way to reach them. A button you cannot reach is a feature you do not have.
+  Labels also stay on one line, so `Values · file` is no longer broken in two.
+
 ## [0.2.2] — 2026-10-19
 
 ### Fixed
