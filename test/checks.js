@@ -73,6 +73,35 @@ check('a micro sign', describe(parseUnit('µm')), 'm');
 check('kilowatt hours are energy', describe(parseUnit('kWh')), 'J');
 check('a percentage is a ratio', describe(parseUnit('%')), 'dimensionless');
 check('specific energy', describe(parseUnit('kJ/kg')), 'm²/s²');
+// A tonne is a mass however it is spelled. Which tonne it is -- metric, short
+// or long -- is a difference of size, not of kind, so nothing here can tell
+// them apart and nothing pretends to.
+check('a tonne', describe(parseUnit('t')), 'kg');
+check('spelled out', describe(parseUnit('tonne')), 'kg');
+check('in the plural', describe(parseUnit('tonnes')), 'kg');
+check('the other spelling', describe(parseUnit('ton')), 'kg');
+check('with a prefix', describe(parseUnit('kt')), 'kg');
+check('a capital T is a tesla, not a tonne', describe(parseUnit('T')), 'T');
+check('scipy agrees about the metric one',
+  describe(collectUnits('from scipy import constants as cn\nx = 2 * cn.metric_ton\n',
+    'python', CFG).x), 'kg');
+check('and ton_TNT is an energy, not a mass',
+  describe(collectUnits('from scipy import constants as cn\nx = 2 * cn.ton_TNT\n',
+    'python', CFG).x), 'J');
+
+// A throughput is per hour or per day far more often than per second.
+check('tonnes per hour', describe(parseUnit('t/h')), 'kg/s');
+check('tonnes per day', describe(parseUnit('tonnes/day')), 'kg/s');
+check('cubic metres per day', describe(parseUnit('m3/day')), 'm³/s');
+check('litres per minute', describe(parseUnit('L/min')), 'm³/s');
+check('a flux through an area', describe(parseUnit('t/(m2 h)')), 'kg/(m²·s)');
+check('energy over a year', describe(parseUnit('kWh/year')), 'W');
+// Words that look like units but are not, which is the risk of accepting any
+// word at all.
+['daily', 'yearly', 'hourly', 'done', 'deadline', 'dry', 'tons_per_thing'].forEach(function (w) {
+  check('"' + w + '" is prose', parseUnit(w), null);
+});
+
 check('prose is not a unit', parseUnit('temperature in kelvin'), null);
 check('a word that is not a unit', parseUnit('nonsense'), null);
 check('an empty string', parseUnit(''), null);

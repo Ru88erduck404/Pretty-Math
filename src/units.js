@@ -218,9 +218,23 @@ const SYMBOLS = {
   kat: dim({ mol: 1, s: -1 }),
 
   // the everyday ones
-  L: dim({ m: 3 }), l: dim({ m: 3 }), min: TIME, h: TIME, hr: TIME, d: TIME,
-  bar: P, atm: P, torr: P, psi: P, eV: J, cal: J, Wh: J, t: MASS,
-  'Å': dim({ m: 1 }), tonne: MASS, ton: MASS,
+  L: dim({ m: 3 }), l: dim({ m: 3 }),
+
+  // Time as it gets written in a rate. A throughput is per hour or per day far
+  // more often than per second, and `# t/day` should mean what it says.
+  min: TIME, mins: TIME, h: TIME, hr: TIME, hrs: TIME, hour: TIME, hours: TIME,
+  d: TIME, day: TIME, days: TIME, wk: TIME, week: TIME, weeks: TIME,
+  yr: TIME, year: TIME, years: TIME,
+
+  bar: P, atm: P, torr: P, psi: P, eV: J, cal: J, Wh: J,
+  'Å': dim({ m: 1 }),
+
+  // A tonne, written any of the ways people write it in a comment. All of them
+  // are a mass and that is all this can check: a metric tonne and a short ton
+  // differ by a tenth in size, not in kind, so nothing here will tell them
+  // apart. For the size as well, multiply by `cn.metric_ton` and skip the
+  // comment -- the units follow from the constant.
+  t: MASS, tonne: MASS, tonnes: MASS, ton: MASS, tons: MASS,
 
   // ratios, which are dimensionless but worth being able to write
   rad: NONE, sr: NONE, '%': NONE, ppm: NONE, ppb: NONE, deg: NONE

@@ -236,6 +236,13 @@ Units come from two places, and **nothing is guessed**:
   `kWh`), as are powers written as `m3`, `m^3` or `m**3`. For anything with a
   space in it, use brackets: `# [J/(mol K)]`.
 
+  Tonnes are `t`, `ton`, `tonne` or `tonnes`, and a throughput can be per hour,
+  day, week or year rather than per second: `# t/day`, `# m3/h`, `# kWh/year`,
+  `# [t/(m2 h)]` all read correctly. Note that a **metric tonne and a short ton
+  differ in size, not in kind**, so this cannot tell them apart — for the size
+  too, write `12.5 * cn.metric_ton` and drop the comment, since the units then
+  follow from the constant.
+
 A name whose units cannot be traced to one of those is left alone. `T = 300` on
 its own says nothing — the number could be kelvin, seconds or a count — so
 nothing is claimed about it and nothing is reported. This is deliberate: a check

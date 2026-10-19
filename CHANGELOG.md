@@ -4,6 +4,17 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.1] — 2026-10-19
+
+### Added
+
+- Tonnes in a unit comment, spelled `t`, `ton`, `tonne` or `tonnes`, and a rate
+  written per hour, day, week or year rather than per second: `# t/day`,
+  `# m3/h`, `# kWh/year`. A throughput is rarely per second, and `# t/day`
+  should mean what it says. A metric tonne and a short ton differ in size and
+  not in kind, so this does not tell them apart; `cn.metric_ton` does, and
+  carries its units with it.
+
 ## [0.2.0] — 2026-10-19
 
 ### Added
