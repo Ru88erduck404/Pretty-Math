@@ -2,7 +2,7 @@
   "name": "pretty-math",
   "displayName": "Pretty Math",
   "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
-  "version": "0.1.6",
+  "version": "0.2.0",
   "publisher": "ru88erduck404",
   "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
   "license": "MIT",
@@ -29,7 +29,8 @@
       { "command": "prettyMath.show", "title": "Show Panel", "category": "Pretty Math" },
       { "command": "prettyMath.pin", "title": "Pin / Unpin Current Expression", "category": "Pretty Math" },
       { "command": "prettyMath.copyLatex", "title": "Copy Current Expression as LaTeX", "category": "Pretty Math" },
-      { "command": "prettyMath.toggleValues", "title": "Toggle Variable Values", "category": "Pretty Math" }
+      { "command": "prettyMath.toggleValues", "title": "Toggle Variable Values", "category": "Pretty Math" },
+      { "command": "prettyMath.toggleChecks", "title": "Toggle Checks", "category": "Pretty Math" }
     ],
     "keybindings": [
       { "command": "prettyMath.show", "key": "alt+p", "mac": "alt+p" },
@@ -104,6 +105,21 @@
           "default": false,
           "markdownDescription": "In a notebook, ask the running kernel what the variables hold, the way the Variables view does. **Off by default**: the Jupyter extension will ask you to grant this extension permission to execute code against kernels, which is a broad permission for a narrow use, so it is opt-in. What gets sent is a single statement that prints the names currently holding a finite number and defines nothing. Only applies while **Values** is on, and only where a kernel is already idle. Without it, values still come from the cells above."
         },
+        "prettyMath.showChecks": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Report what is wrong with the formula as well as drawing it: units that do not match, and a short list of mistakes that are certain rather than suspected. Toggled by the **Checks** button in the panel."
+        },
+        "prettyMath.checkUnits": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Check that the quantities in a formula can be combined: that an energy is not added to a pressure, and that nothing with units is handed to `exp` or `sin`. Units are known from `scipy.constants` and from any unit you write in a trailing comment, as in `T = 300  # K`. A name whose units cannot be traced is left alone, so nothing is guessed."
+        },
+        "prettyMath.lintFormulas": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Point out mistakes that are certain: degrees handed to a function that wants radians, equality between floating-point numbers, `-2**2`, integer division that truncates, a comparison chain in a language that has none, and a bit mask compared before it is applied."
+        },
         "prettyMath.valueDigits": {
           "type": "number",
           "default": 6,
@@ -130,7 +146,7 @@
     }
   },
   "scripts": {
-    "test": "node test/run.js && node test/host.js && node test/corpus.js && node test/libraries.js && node test/hostile.js && node test/fuzz.js",
+    "test": "node test/run.js && node test/host.js && node test/corpus.js && node test/libraries.js && node test/checks.js && node test/hostile.js && node test/fuzz.js",
     "package": "npx --yes @vscode/vsce package"
   },
   "repository": { "type": "git", "url": "https://github.com/Ru88erduck404/Pretty-Math.git" },

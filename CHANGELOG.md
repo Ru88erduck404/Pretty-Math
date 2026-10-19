@@ -4,6 +4,35 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.0] — 2026-10-19
+
+### Added
+
+- **The panel now says when a formula is wrong, not only what it says.** A
+  **Checks** button, on by default and switched off in one click, reports two
+  kinds of thing and nothing else.
+- **Units.** Adding a pressure to a temperature is invisible in the code and
+  invisible in the drawing, and is the kind of mistake that survives review.
+  Units are known from `scipy.constants` — all 122 names, through whatever the
+  file called the module — and from a unit written in a comment, as in
+  `T = 300  # K`, `# m3/s` or `# [J/(mol K)]`. Prefixes and powers are
+  understood. Roots halve the units, so the root of an area is a length.
+
+  Nothing is guessed. `T = 300` on its own says nothing about what the number
+  is of, so nothing is claimed and nothing is reported; a bare number added to
+  a quantity is the ordinary idiom and is left alone. What is reported is
+  adding or comparing quantities that do not match, handing one to `exp` or
+  `sin`, an exponent with units, and arguments that disagree with each other.
+- **Mistakes that are certain**: degrees handed to a function that wants
+  radians, equality between floating-point numbers, `-2**2`, integer division
+  that truncates, a comparison chain in a language that has none, and a bit
+  mask compared before it is applied. Each is reported only where it is
+  genuinely wrong, so `0 < i < n` is a remark in C++ and silence in Python.
+  There is no rule for "this looks odd": the drawing is already the tool for
+  judgement calls, and a panel that cries wolf is one nobody reads.
+
+  Clicking a remark selects the part of the line it is about.
+
 ## [0.1.6] — 2026-10-18
 
 ### Changed

@@ -194,6 +194,7 @@ captured.resolveWebviewView(view);
 check('webview scripts enabled', view.webview.options.enableScripts, true);
 check('webview html has a CSP', /Content-Security-Policy/.test(view.webview.html), true);
 check('webview html loads the panel script', /panel\.js/.test(view.webview.html), true);
+check('webview html has a Checks button', /id="checks"/.test(view.webview.html), true);
 
 const render = posted.filter(function (m) { return m.type === 'render'; }).pop();
 check('a render was posted', !!render, true);
@@ -226,6 +227,46 @@ check('reveal moves the selection',
 // Copy LaTeX.
 view.webview._onMessage({ type: 'copyLatex' });
 check('latex copied', clipboard, '\\mathrm{speed} = \\frac{\\mathrm{distance}}{t_{\\mathrm{end}} - t_{\\mathrm{start}}}');
+
+// ---- checks ----------------------------------------------------------------
+
+// The whole path, as the extension runs it: units are read from the file above
+// the cursor, and the remark comes back in the payload the panel draws from.
+const checkDoc = [
+  'from scipy import constants as cn',
+  'T = 300  # K',
+  'P = 2.0 * cn.bar',
+  'total = P + T',
+  ''
+].join('\n');
+editor.document = makeDocument(checkDoc, 'python');
+editor.selection = new Selection(new Position(3, 3), new Position(3, 3));
+captured.update(true);
+let checked = posted.filter(function (m) { return m.type === 'render'; }).pop();
+check('the panel is told checks are on', checked.checking, true);
+check('a unit mismatch is reported', (checked.statements[0].checks || []).length, 1);
+check('and it says which two quantities',
+  (checked.statements[0].checks[0] || {}).message, /Pa and K/);
+check('the remark points back into the document',
+  checkDoc.slice(checked.statements[0].checks[0].docStart,
+    checked.statements[0].checks[0].docEnd), 'P + T');
+
+// A formula that is right gets no remark, which is the common case.
+editor.document = makeDocument(checkDoc.replace('total = P + T', 'total = P * T'), 'python');
+captured.update(true);
+checked = posted.filter(function (m) { return m.type === 'render'; }).pop();
+check('a sound formula is met with silence',
+  (checked.statements[0].checks || []).length, 0);
+
+// Switched off, nothing is reported and the panel knows why it is quiet.
+DEFAULTS.showChecks = false;
+editor.document = makeDocument(checkDoc, 'python');
+captured.update(true);
+checked = posted.filter(function (m) { return m.type === 'render'; }).pop();
+check('nothing is checked once switched off',
+  (checked.statements[0].checks || []).length, 0);
+check('and the button is told', checked.checking, false);
+delete DEFAULTS.showChecks;
 
 // ---- variable values -------------------------------------------------------
 

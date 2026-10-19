@@ -200,6 +200,80 @@ written in the source — those stay blue. Hovering one shows the name it replac
 are showing. Values are for checking magnitudes on the spot; the algebra is what
 you want in a document.
 
+## Checking the formula
+
+The drawing shows you how an expression is put together. The **Checks** button
+goes further and says when it is wrong. It reports two kinds of thing, and
+nothing else: units that cannot be combined, and mistakes that are certain.
+
+A quiet panel means nothing was found — the button reads `Checks · ok` so that
+this is distinguishable from the checks being switched off.
+
+### Units
+
+Adding a pressure to a temperature is invisible in the code and invisible in the
+drawing. It is not invisible to this:
+
+```python
+from scipy import constants as cn
+T = 300           # K
+P = 1.013 * cn.bar
+Q = 0.05          # m3/s
+A = 1.2           # m2
+rho = 998         # kg/m3
+
+v = Q / A + rho   # adds m/s and kg/m³, which are different kinds of quantity
+G = P * V / (cn.R * T)   # nothing to report
+```
+
+Units come from two places, and **nothing is guessed**:
+
+- **`scipy.constants`.** Every one of its 122 names is on the record, through
+  whatever the file called the module. `cn.bar` is a pressure, `cn.R` is
+  J/(mol·K), `cn.kilo` is the number 1000 and carries no units at all.
+- **A unit written in a comment.** `T = 300  # K` says what the 300 is, and so
+  do `# m3/s`, `# kg/m3` and `# Pa*s`. Prefixes are understood (`mm`, `µm`,
+  `kWh`), as are powers written as `m3`, `m^3` or `m**3`. For anything with a
+  space in it, use brackets: `# [J/(mol K)]`.
+
+A name whose units cannot be traced to one of those is left alone. `T = 300` on
+its own says nothing — the number could be kelvin, seconds or a count — so
+nothing is claimed about it and nothing is reported. This is deliberate: a check
+that guesses is worse than no check.
+
+What gets reported: adding or subtracting different quantities, comparing them,
+handing a quantity to `exp`, `log` or `sin`, an exponent with units, and
+arguments to `hypot` or `min` that disagree. Roots halve the units, so
+`sqrt(area)` is a length and the result is usable further down.
+
+What deliberately does not: `P + 101325`, where a bare number stands in for a
+pressure. That idiom is far too common to be worth a remark.
+
+°C and °F are not supported, because they are offsets as well as scales — `T_c +
+10` means something while `T_c * 2` does not, and nothing good comes of
+pretending otherwise. Use kelvin.
+
+### Mistakes that are certain
+
+Every rule here fires only where the code is wrong, or where it means something
+other than what it reads as. There is no rule for "this looks odd" — the drawing
+is already the tool for judgement calls.
+
+| | |
+| --- | --- |
+| degrees into a function wanting radians | `math.sin(theta_deg)`, and `theta_deg = atan(...)` |
+| equality between floating-point numbers | `(a - b) == 1.5` |
+| a minus sign outside a power | `-2**2` is −4 |
+| integer division that truncates | `1 / 2` in C, C++, Java, Go, Rust |
+| a comparison chain where there is none | `0 < i < n` outside Python and Julia |
+| a mask compared before it is applied | `flags & 0xFF == 0` in C |
+
+The last three are language-specific, and the panel reads each language by its
+own rules: `0 < i < n` is a chain in Python and a bug in C++, so it is reported
+in one and not the other.
+
+Clicking a remark selects the part of the line it is about.
+
 ## Settings
 
 | Setting | Default | |
@@ -215,6 +289,9 @@ you want in a document.
 | `prettyMath.stripNamespaces` | `Math, math, np, sp, sympy, self, …` | qualifiers to drop |
 | `prettyMath.substituteValues` | `false` | the Values button; draw what variables are worth |
 | `prettyMath.valueDigits` | `6` | significant digits for a substituted value |
+| `prettyMath.showChecks` | `true` | the Checks button; report what is wrong as well as drawing it |
+| `prettyMath.checkUnits` | `true` | dimensional analysis, from scipy.constants and unit comments |
+| `prettyMath.lintFormulas` | `true` | the short list of certain mistakes |
 | `prettyMath.showLatex` | `false` | LaTeX under the drawing |
 | `prettyMath.showTree` | `false` | parse tree under the drawing |
 | `prettyMath.maxLines` | `40` | statements drawn from one selection |

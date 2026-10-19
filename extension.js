@@ -2,7 +2,8 @@
 
 const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
-const { collectValues, valuesFromDebugger, mathAliases } = require('./src/values');
+const { collectValues, valuesFromDebugger, mathAliases, importModules } = require('./src/values');
+const { collectUnits } = require('./src/units');
 const { formatNumber } = require('./src/evaluate');
 const { readKernelValues } = require('./src/jupyter');
 
@@ -40,6 +41,9 @@ function readConfig(doc) {
     substituteValues: c.get('substituteValues', false),
     valueDigits: c.get('valueDigits', 6),
     jupyterValues: c.get('jupyterValues', false),
+    showChecks: c.get('showChecks', true),
+    checkUnits: c.get('checkUnits', true),
+    lintFormulas: c.get('lintFormulas', true),
     valueScanLines: VALUE_LINES
   };
 }
@@ -281,10 +285,30 @@ class PrettyMathView {
       }
     }
 
+    // What each name is a quantity of, read from the same text. Independent
+    // of values: a name can have units without having a number, and the units
+    // are the half that survives a loop or a branch.
+    let unitEnv = null;
+    let unitModules = null;
+    if (cfg.showChecks && cfg.checkUnits) {
+      try {
+        unitEnv = collectUnits(above, editor.document.languageId, cfg);
+        unitModules = importModules(above);
+      } catch (err) {
+        unitEnv = null;
+        unitModules = null;
+      }
+    }
+
     const run = (vals) => {
       return analyze(win.text, { start: selStart, end: selEnd },
         editor.document.languageId,
-        Object.assign({}, cfg, { base: win.base, values: vals }));
+        Object.assign({}, cfg, {
+          base: win.base,
+          values: vals,
+          unitEnv: unitEnv || {},
+          unitModules: unitModules || {}
+        }));
     };
 
     let payload;
@@ -310,6 +334,7 @@ class PrettyMathView {
       showLatex: cfg.showLatex,
       showTree: cfg.showTree,
       substituting: cfg.substituteValues,
+      checking: cfg.showChecks,
       valueSource: cfg.substituteValues
         ? (debugging ? 'debugger' : (values && Object.keys(values).length ? 'file' : 'none'))
         : null,
@@ -496,6 +521,7 @@ class PrettyMathView {
       '<button id="smaller" title="Smaller">A-</button>' +
       '<button id="bigger" title="Bigger">A+</button>' +
       '<button id="values" title="Plug in what the variables are worth, from the file or from a paused debug session">Values</button>' +
+      '<button id="checks" title="Check the units and point out mistakes that are certain">Checks</button>' +
       '<button id="showtex" title="Show the LaTeX under each expression">LaTeX</button>' +
       '<button id="tex" title="Copy this expression as LaTeX">Copy</button>' +
       '<button id="pin" title="Freeze the panel on this expression">Pin</button>' +
@@ -530,6 +556,11 @@ function activate(context) {
     }),
     vscode.commands.registerCommand('prettyMath.copyLatex', function () {
       provider.copyLatex();
+    }),
+    vscode.commands.registerCommand('prettyMath.toggleChecks', function () {
+      const c = vscode.workspace.getConfiguration('prettyMath');
+      return c.update('showChecks', !c.get('showChecks', true),
+        vscode.ConfigurationTarget.Global);
     }),
     vscode.commands.registerCommand('prettyMath.toggleValues', function () {
       const c = vscode.workspace.getConfiguration('prettyMath');

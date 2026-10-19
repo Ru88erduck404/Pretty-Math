@@ -16,8 +16,26 @@ const CFG = {
                     'sp', 'sym', 'sympy', 'smp', 'self', 'this'],
   caretMeansPower: 'auto',
   maxLines: 40,
-  fontSize: 22
+  fontSize: 22,
+  showChecks: true,
+  checkUnits: true,
+  lintFormulas: true
 };
+
+// A little file for the samples that need to know what things are quantities
+// of. Units come from scipy, or from a comment where the code says so.
+const PLANT = [
+  'from scipy import constants as cn',
+  'import math',
+  'T = 300  # K',
+  'P = 1.013 * cn.bar',
+  'Vol = 0.025  # m3',
+  'n_mol = 2.0  # mol',
+  'A_col = 1.2  # m2',
+  'Q = 0.05  # m3/s',
+  'rho = 998  # kg/m3',
+  ''
+].join('\n');
 
 const SAMPLES = [
   ['python', 'E = 0.5 * m * v**2'],
@@ -44,6 +62,17 @@ const SAMPLES = [
   ['cpp', 'double f = (v0*t + 0.5*g*t*t) / (1 + k*k); // fall'],
   ['javascript', 'const mid = lo + (hi - lo) / 2;'],
   ['python', 'y = a + * b'],
+
+  ['python', 'G = (P*Vol)/(cn.R*T)', PLANT],
+  ['python', 'wrong = Q / A_col + rho', PLANT],
+  ['python', 'wrong2 = Vol + A_col', PLANT],
+  ['python', 'wrong3 = math.exp(P)', PLANT],
+  ['python', 'y = math.sin(theta_deg)'],
+  ['python', 'e = -2**2'],
+  ['c', 'double d = 1 / 2;'],
+  ['cpp', 'bool ok = 0 < i < n;'],
+  ['c', 'int m = flags & 0xFF == 0;'],
+  ['python', 'ok = (a - b) == 1.5'],
 
   ['python', 'r = math.sqrt(x)'],
   ['python', 'r = math.sqrt(a + b) + math.sqrt(x/y) + math.sqrt(1 + n**2)'],
@@ -107,13 +136,19 @@ const OUT = process.argv[4] || 'demo.html';
 
 // A sample may carry a third element: source to read variable values from, so
 // the substitution mode can be eyeballed too.
-const { collectValues } = require('../src/values');
+const { collectValues, importModules } = require('../src/values');
+const { collectUnits } = require('../src/units');
 
 const rows = SAMPLES.slice(FROM, TO).map(function (pair) {
   const lang = pair[0];
   const src = pair[1];
-  const cfg = pair[2]
-    ? Object.assign({}, CFG, { values: collectValues(pair[2], lang, CFG) })
+  const context = pair[2];
+  const cfg = context
+    ? Object.assign({}, CFG, {
+        values: collectValues(context, lang, CFG),
+        unitEnv: collectUnits(context, lang, CFG),
+        unitModules: importModules(context)
+      })
     : CFG;
   const out = analyze(src, { start: 0, end: 0 }, lang, cfg);
   const st = out.statements[0] || { html: '', source: src, latex: '', error: null };
@@ -129,6 +164,7 @@ const payload = {
   fontSize: CFG.fontSize,
   showLatex: true,
   showTree: false,
+  checking: true,
   cursor: -1,
   statements: rows
 };

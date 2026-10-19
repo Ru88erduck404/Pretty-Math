@@ -5,6 +5,8 @@ const { statementsAt } = require('./prep');
 const { parse, precedenceFor, dottedName } = require('./parser');
 const { makeRenderer, treeText, esc } = require('./render');
 const { toLatex } = require('./latex');
+const { checkUnits } = require('./units');
+const { lint } = require('./lint');
 
 // Parses and renders one already-cleaned statement.
 function renderChunk(chunk, flavor, config) {
@@ -83,8 +85,75 @@ function renderChunk(chunk, flavor, config) {
   }
 
   result.names = readableNames(ast, config.stripNamespaces || []);
+  result.checks = runChecks(ast, flavor, config, mapOffset, chunk.text);
 
   return result;
+}
+
+// What the panel has to say about the statement beyond drawing it. A check that
+// throws is a check that says nothing: a bug in here must never cost you the
+// picture, which is the part you actually came for.
+function runChecks(ast, flavor, config, mapOffset, text) {
+  if (!config.showChecks) return [];
+  const found = [];
+
+  // A check that throws says nothing, so that a bug in one cannot cost the
+  // drawing. Under test that silence would hide the bug, so `strictChecks`
+  // lets it through.
+  const guarded = function (fn) {
+    try {
+      fn().forEach(function (p) { found.push(p); });
+    } catch (err) {
+      if (config.strictChecks) throw err;
+    }
+  };
+
+  if (config.checkUnits !== false) {
+    guarded(function () {
+      return checkUnits(ast, {
+        env: config.unitEnv || {},
+        modules: config.unitModules || {},
+        stripNamespaces: config.stripNamespaces || []
+      });
+    });
+  }
+
+  if (config.lintFormulas !== false) {
+    guarded(function () {
+      return lint(ast, flavor, { assignedTo: assignedName(ast) });
+    });
+  }
+
+  // Sorted by where they are, so reading the list follows reading the formula,
+  // and deduplicated: two rules reaching the same conclusion is one remark.
+  const seen = Object.create(null);
+  return found
+    .sort(function (a, b) { return a.s - b.s; })
+    .filter(function (p) {
+      const key = p.rule + ':' + p.s + ':' + p.e + ':' + p.message;
+      if (seen[key]) return false;
+      seen[key] = true;
+      return true;
+    })
+    .map(function (p) {
+      const from = Math.max(0, Math.min(p.s, text.length));
+      const to = Math.max(from, Math.min(p.e, text.length));
+      return {
+        rule: p.rule,
+        message: p.message,
+        docStart: mapOffset(p.s),
+        docEnd: mapOffset(p.e),
+        // The part of the line the remark is about, so the panel can quote it.
+        source: text.slice(from, to).trim()
+      };
+    });
+}
+
+// The name on the left of the assignment, which is what tells us a result is
+// being kept as degrees.
+function assignedName(ast) {
+  if (!ast || ast.type !== 'Assign') return null;
+  return dottedName(ast.l);
 }
 
 // Every name whose value would be worth asking a debugger about: the ones that

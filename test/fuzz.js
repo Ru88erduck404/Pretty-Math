@@ -18,7 +18,17 @@ const { collectValues } = require('../src/values');
 const CFG = {
   multiplication: 'implicit', indexAsSubscript: true, greekLetters: true,
   expandIdentities: true, derivativeSymbol: 'auto', maxLines: 40,
-  stripNamespaces: ['math', 'np', 'sp', 'self']
+  stripNamespaces: ['math', 'np', 'sp', 'self'],
+  // The checks run over every generated expression too: a rule that throws
+  // would cost the drawing, which is the one thing that must always survive.
+  showChecks: true, checkUnits: true, lintFormulas: true, strictChecks: true,
+  unitEnv: {
+    P: [1, -1, -2, 0, 0, 0, 0],      // Pa
+    T: [0, 0, 0, 0, 1, 0, 0],        // K
+    v: [0, 1, -1, 0, 0, 0, 0],       // m/s
+    theta_deg: [0, 0, 0, 0, 0, 0, 0]
+  },
+  unitModules: { cn: 'scipy.constants', math: 'math', np: 'numpy' }
 };
 const LANGS = ['python', 'javascript', 'c', 'cpp', 'java', 'rust', 'julia'];
 
@@ -32,7 +42,9 @@ function pick(a) { return a[Math.floor(rnd() * a.length) % a.length]; }
 function chance(p) { return rnd() < p; }
 
 const NAMES = ['x', 'y', 'a_i', 'theta', 'v_0', 'rate', 'self.mass', 'np.pi',
-  'data[i]', 'længde', 'n'];
+  'data[i]', 'længde', 'n',
+  // Names the unit checker has an opinion about, so its rules are reached.
+  'P', 'T', 'v', 'theta_deg', 'cn.R', 'cn.bar', 'cn.gram', 'cn.kilo'];
 const NUMS = ['0', '1', '2', '0.5', '1e-3', '0xFF', '1_000', '9.81', '.5'];
 const BIN = ['+', '-', '*', '/', '**', '<<', '>>', '&', '|', '^', '==', '!=', '<', '>='];
 const FUNCS = ['math.sqrt', 'abs', 'math.exp', 'math.log', 'math.sin', 'np.linalg.norm',

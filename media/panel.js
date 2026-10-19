@@ -164,6 +164,30 @@
     src.textContent = st.source;
     row.appendChild(src);
 
+    // Remarks sit under the drawing, in the order they appear in the formula,
+    // each quoting the part it is about so there is no hunting for it.
+    (st.checks || []).forEach(function (c) {
+      const note = document.createElement('div');
+      note.className = 'check';
+      const what = document.createElement('span');
+      what.className = 'check-what';
+      what.textContent = c.source || '';
+      const says = document.createElement('span');
+      says.className = 'check-says';
+      says.textContent = c.message;
+      if (c.source) note.appendChild(what);
+      note.appendChild(says);
+      note.title = c.rule;
+      // Clicking a remark puts the cursor on the part of the line it is about.
+      if (typeof c.docStart === 'number') {
+        note.classList.add('clickable');
+        note.addEventListener('click', function () {
+          post({ type: 'reveal', s: c.docStart, e: c.docEnd });
+        });
+      }
+      row.appendChild(note);
+    });
+
     if (opts.showLatex && st.latex) {
       const tex = document.createElement('div');
       tex.className = 'extra';
@@ -191,6 +215,22 @@
     pinButton.textContent = msg.pinned ? 'Pinned' : 'Pin';
     const texButton = document.getElementById('showtex');
     if (texButton) texButton.classList.toggle('on', !!msg.showLatex);
+
+    const checkButton = document.getElementById('checks');
+    if (checkButton) {
+      checkButton.classList.toggle('on', !!msg.checking);
+      // The count is the point: a quiet panel means nothing was found, which
+      // is worth being able to tell apart from the checks being switched off.
+      let found = 0;
+      (msg.statements || []).forEach(function (st) { found += (st.checks || []).length; });
+      checkButton.textContent = !msg.checking ? 'Checks'
+        : found ? 'Checks · ' + found : 'Checks · ok';
+      checkButton.title = !msg.checking
+        ? 'Check the units and point out mistakes that are certain'
+        : found
+          ? found + (found === 1 ? ' remark' : ' remarks') + ' about this formula'
+          : 'Nothing wrong found in what is drawn here';
+    }
 
     const valButton = document.getElementById('values');
     if (valButton) {
@@ -260,6 +300,12 @@
     showTex.addEventListener('click', function () {
       const next = !(state && state.showLatex);
       post({ type: 'setConfig', key: 'showLatex', value: next });
+    });
+  }
+  const checksButton = document.getElementById('checks');
+  if (checksButton) {
+    checksButton.addEventListener('click', function () {
+      post({ type: 'setConfig', key: 'showChecks', value: !(state && state.checking) });
     });
   }
   const valuesButton = document.getElementById('values');
