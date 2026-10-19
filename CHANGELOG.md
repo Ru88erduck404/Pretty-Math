@@ -4,6 +4,35 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.2.2] — 2026-10-19
+
+### Fixed
+
+- A compound unit written with spaces is read, rather than silently ignored.
+  `# Pa s`, `# mol/(m2 s)` and `# J/(mol K)` are how these are written, and
+  requiring brackets meant that a name declared that way had no units at all —
+  so every check that depended on it quietly passed. The guard it replaced
+  turned out to earn nothing: of twenty-nine real prose comments, not one
+  parses as a unit, because prose almost always contains a word that is not a
+  unit symbol.
+
+### Added
+
+- Chemistry units: molarity (`M`, `mM`, `µM`), molar mass and molar energy,
+  mass-transfer coefficients such as `mol/(m2 s Pa)`, rate constants such as
+  `m3/(mol s)`, viscosity in poise, conductivity, daltons, equivalents, `mmHg`
+  and `wt%`. Combinations a reaction or a separation is written in now come
+  back by name — `mol/(m²·s)`, `J/mol`, `W/(m·K)` — instead of as a row of
+  exponents.
+
+### Changed
+
+- `# C` and `# F` declare nothing, rather than being read as coulomb and
+  farad. On a comment attached to a number they mean Celsius and Fahrenheit
+  far more often, and those are offset scales that cannot be checked at all,
+  so a wrong unit was the one outcome worth avoiding. `coulomb` and `farad`
+  spelled out still work.
+
 ## [0.2.1] — 2026-10-19
 
 ### Added

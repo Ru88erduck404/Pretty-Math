@@ -87,7 +87,22 @@ const NAMED = [
   ['Pa·s', dim({ kg: 1, m: -1, s: -1 })],
   ['m²/s', dim({ m: 2, s: -1 })],
   ['W/(m²·K⁴)', dim({ kg: 1, s: -3, K: -4 })],
-  ['m·K', dim({ m: 1, K: 1 })]
+  ['m·K', dim({ m: 1, K: 1 })],
+
+  // Chemistry and transport, where the bare exponents are least readable and
+  // a mismatch is least obvious.
+  ['kg/mol', dim({ kg: 1, mol: -1 })],
+  ['J/mol', dim({ kg: 1, m: 2, s: -2, mol: -1 })],
+  ['mol/(m²·s)', dim({ mol: 1, m: -2, s: -1 })],
+  ['mol/(m³·s)', dim({ mol: 1, m: -3, s: -1 })],
+  ['kg/(m²·s)', dim({ kg: 1, m: -2, s: -1 })],
+  ['m³/(mol·s)', dim({ m: 3, mol: -1, s: -1 })],
+  ['mol/(m²·s·Pa)', dim({ mol: 1, m: -1, s: 1, kg: -1 })],
+  ['J/(kg·K)', dim({ m: 2, s: -2, K: -1 })],
+  ['W/(m·K)', dim({ kg: 1, m: 1, s: -3, K: -1 })],
+  ['W/(m²·K)', dim({ kg: 1, s: -3, K: -1 })],
+  ['S/m', dim({ kg: -1, m: -3, s: 3, A: 2 })],
+  ['N/m', dim({ kg: 1, s: -2 })]
 ];
 
 // "Pa", or failing that the exponents themselves, which still make a mismatch
@@ -208,9 +223,15 @@ const SYMBOLS = {
   mol: dim({ mol: 1 }), cd: dim({ cd: 1 }),
 
   // named derived units
+  //
+  // C and F are deliberately absent. In a comment on a number they mean
+  // Celsius and Fahrenheit far more often than coulomb and farad, and those
+  // are offset scales this cannot check at all -- so reading `T = 25  # C` as
+  // a charge would be actively wrong, where saying nothing is merely quiet.
+  // Spell them out to mean the electrical ones.
   Hz: dim({ s: -1 }), N: N, Pa: P, J: J, W: dim({ kg: 1, m: 2, s: -3 }),
-  C: dim({ A: 1, s: 1 }), V: dim({ kg: 1, m: 2, s: -3, A: -1 }),
-  F: dim({ kg: -1, m: -2, s: 4, A: 2 }),
+  coulomb: dim({ A: 1, s: 1 }), V: dim({ kg: 1, m: 2, s: -3, A: -1 }),
+  farad: dim({ kg: -1, m: -2, s: 4, A: 2 }),
   ohm: dim({ kg: 1, m: 2, s: -3, A: -2 }), 'Ω': dim({ kg: 1, m: 2, s: -3, A: -2 }),
   S: dim({ kg: -1, m: -2, s: 3, A: 2 }), Wb: dim({ kg: 1, m: 2, s: -2, A: -1 }),
   T: dim({ kg: 1, s: -2, A: -1 }), H: dim({ kg: 1, m: 2, s: -2, A: -2 }),
@@ -236,8 +257,17 @@ const SYMBOLS = {
   // comment -- the units follow from the constant.
   t: MASS, tonne: MASS, tonnes: MASS, ton: MASS, tons: MASS,
 
+  // chemistry
+  //
+  // A molarity is a concentration: M is mol/L, and the prefixes follow, so mM
+  // and µM work without being listed. An equivalent is a mole divided by a
+  // valence, which is dimensionless, so dimensionally it is just a mole.
+  M: dim({ mol: 1, m: -3 }), Da: MASS, eq: dim({ mol: 1 }),
+  mmHg: P, P: dim({ kg: 1, m: -1, s: -1 }),   // poise, so that cP works
+
   // ratios, which are dimensionless but worth being able to write
-  rad: NONE, sr: NONE, '%': NONE, ppm: NONE, ppb: NONE, deg: NONE
+  rad: NONE, sr: NONE, '%': NONE, ppm: NONE, ppb: NONE, deg: NONE,
+  'wt%': NONE, 'mol%': NONE, 'vol%': NONE
 };
 
 // Prefixes never change a dimension, only a magnitude, so they are stripped
@@ -356,10 +386,15 @@ function parseUnit(text) {
 
 // The unit a trailing comment declares, if it declares one.
 //
-// Two spellings are accepted, and nothing else. In brackets -- `# [J/(mol K)]`
-// -- anything that parses counts. Without brackets the comment has to be a
-// single run of characters, so `# K` and `# kg/s` are units while `# in K` and
-// `# temperature in kelvin` are what they look like: prose.
+// A comment counts as a declaration when the whole of it is a unit and nothing
+// else, in brackets or not: `# K`, `# Pa s`, `# mol/(m2 s)`, `# [J/(mol K)]`.
+//
+// Spaces are allowed because a compound unit is usually written with them, and
+// because prose gives itself away: an English comment almost always contains a
+// word that is not a unit symbol, and the one word that would be dangerous --
+// "in", as in `# value in mol` -- is not in the vocabulary, so `in` is prose
+// and an inch has to be written some other way. Length is capped so that a
+// long sentence is not even attempted.
 function unitComment(line, flavor) {
   const marker = (flavor && flavor.lineComment) || '#';
   const at = String(line).indexOf(marker);
@@ -369,8 +404,7 @@ function unitComment(line, flavor) {
 
   const bracketed = /^[[(]\s*(.+?)\s*[\])]$/.exec(body);
   if (bracketed) return parseUnit(bracketed[1]);
-  if (/\s/.test(body)) return null;
-  if (body.length > 24) return null;
+  if (body.length > 32) return null;
   return parseUnit(body);
 }
 

@@ -206,6 +206,94 @@ check('an SI prefix carries no dimension',
 check('an angle may be handed to sin',
   rules('x = math.sin(30 * cn.degree)', FILE), 'quiet');
 
+// ------------------------------------------------------------- chemistry
+
+check('a molarity is a concentration', describe(parseUnit('M')), 'mol/m³');
+check('and its prefixes follow', describe(parseUnit('mM')), 'mol/m³');
+check('written out the long way', describe(parseUnit('mol/L')), 'mol/m³');
+check('a molar mass', describe(parseUnit('g/mol')), 'kg/mol');
+check('a molar energy', describe(parseUnit('kJ/mol')), 'J/mol');
+check('a molar flux', describe(parseUnit('mol/(m2 s)')), 'mol/(m²·s)');
+check('a gas-film coefficient', describe(parseUnit('mol/(m2 s Pa)')), 'mol/(m²·s·Pa)');
+check('a second-order rate constant', describe(parseUnit('m3/(mol s)')), 'm³/(mol·s)');
+check('a viscosity in poise', describe(parseUnit('cP')), 'Pa·s');
+check('a viscosity in Pa s, spaces and all', describe(parseUnit('Pa s')), 'Pa·s');
+check('a conductivity', describe(parseUnit('mS/cm')), 'S/m');
+check('a thermal conductivity', describe(parseUnit('W/(m K)')), 'W/(m·K)');
+check('a heat capacity', describe(parseUnit('kJ/(kg K)')), 'J/(kg·K)');
+check('an equivalent is dimensionally a mole', describe(parseUnit('meq')), 'mol');
+check('a dalton is a mass', describe(parseUnit('kDa')), 'kg');
+check('a weight percentage is a ratio', describe(parseUnit('wt%')), 'dimensionless');
+check('mmHg is a pressure', describe(parseUnit('mmHg')), 'Pa');
+// A symbol beats a prefix, so M, P and their compounds all still read right.
+check('M before mega', describe(parseUnit('MPa')), 'Pa');
+check('P before peta', describe(parseUnit('PJ')), 'J');
+check('and a megawatt is still a megawatt', describe(parseUnit('MW')), 'W');
+
+// C and F in a comment on a number mean Celsius and Fahrenheit far more often
+// than coulomb and farad, and those are offset scales nothing here can check.
+// Reading `# C` as a charge would be wrong; saying nothing is merely quiet.
+['C', 'F', 'degC', '°C'].forEach(function (u) {
+  check('"' + u + '" is left alone rather than guessed', parseUnit(u), null);
+});
+check('the electrical ones spelled out', describe(parseUnit('coulomb')), 'C');
+check('and the other one', describe(parseUnit('farad')), 'F');
+
+const PLANT = [
+  'from scipy import constants as cn',
+  'import math',
+  'T = 323.15     # K',
+  'rho = 998      # kg/m3',
+  'mu = 1.0e-3    # Pa s',
+  'dia = 0.05     # m',
+  'u = 0.4        # m/s',
+  'D_ab = 1.8e-9  # m2/s',
+  'C_A = 150      # mol/m3',
+  'kL = 2.5e-5    # m/s',
+  'kG = 3.0e-6    # mol/(m2 s Pa)',
+  'p_A = 2000     # Pa',
+  'a_int = 120    # m2/m3',
+  'Z = 4.5        # m',
+  'MW = 0.046     # kg/mol',
+  'mdot = 1.4     # kg/s',
+  'Ea = 52.3e3    # J/mol',
+  ''
+].join('\n');
+
+// A compound unit written with spaces has to be read, or the name is silently
+// unknown and every check that depended on it quietly passes.
+check('a unit with spaces is read', describe(collectUnits(PLANT, 'python', CFG).mu), 'Pa·s');
+check('and one with brackets and spaces',
+  describe(collectUnits(PLANT, 'python', CFG).kG), 'mol/(m²·s·Pa)');
+
+// Formulas a chemical engineer actually writes. Every one of these is right,
+// and the only acceptable response to a right formula is silence.
+[
+  ['ideal gas', 'n = p_A*Z/(cn.R*T)'],
+  ['Arrhenius', 'k = math.exp(-Ea/(cn.R*T))'],
+  ['molar flux from a gas film', 'N_A = kG * p_A'],
+  ['molar flux from a liquid film', 'N_B = kL * C_A'],
+  ['flux over a packed height', 'rate = kG * p_A * a_int * Z'],
+  ['molar flow from mass flow', 'nd = mdot / MW'],
+  ['Reynolds', 'Re = rho * u * dia / mu'],
+  ['Schmidt', 'Sc = mu / (rho * D_ab)'],
+  ['Sherwood', 'Sh = kL * dia / D_ab'],
+  ['a concentration ratio', 'r = math.log(C_A / (2*C_A))']
+].forEach(function (pair) {
+  check(pair[0] + ' is sound', rules(pair[1], PLANT), 'quiet');
+});
+
+// And the matching mistakes, which must not be silent.
+[
+  ['a flux added to a concentration', 'bad = kG * p_A + C_A'],
+  ['a viscosity added to a temperature', 'bad = rho * u * dia + T'],
+  ['a mass flow added to a molar flow', 'bad = mdot + mdot/MW'],
+  ['an activation energy without RT', 'bad = math.exp(-Ea/T)'],
+  ['a pressure compared with a concentration', 'bad = p_A > C_A']
+].forEach(function (pair) {
+  check(pair[0] + ' is reported', rules(pair[1], PLANT), 'units');
+});
+
 // ---------------------------------------------------------------- the lint
 
 check('degrees into sin', rules('y = math.sin(theta_deg)'), 'degrees');
@@ -316,7 +404,7 @@ check('a hostile unit comment is handled quickly', held, NASTY.length);
 check('the same dimensions compare equal', same(dim({ m: 1 }), dim({ m: 1 })), true);
 check('different ones do not', same(dim({ m: 1 }), dim({ s: 1 })), false);
 check('an unnamed combination still reads',
-  describe(dim({ kg: 1, m: 2, s: -2, mol: -1 })), 'kg·m²/(s²·mol)');
+  describe(dim({ kg: 1, m: 2, s: -2, mol: -1, K: 2 })), 'kg·m²·K²/(s²·mol)');
 check('a single thing below the line needs no brackets',
   describe(dim({ m: 1, s: -1 })), 'm/s');
 

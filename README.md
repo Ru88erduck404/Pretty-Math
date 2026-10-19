@@ -243,6 +243,57 @@ Units come from two places, and **nothing is guessed**:
   too, write `12.5 * cn.metric_ton` and drop the comment, since the units then
   follow from the constant.
 
+### Chemistry
+
+The vocabulary covers what a reaction or a separation is written in:
+
+```python
+C_A  = 150      # mol/m3      (or # M, # mM — a molarity is a concentration)
+MW   = 0.046    # g/mol
+Ea   = 52.3e3   # J/mol
+k2   = 0.004    # m3/(mol s)
+kG   = 3.0e-6   # mol/(m2 s Pa)
+mu   = 1.0e-3   # Pa s        (or # cP)
+D_ab = 1.8e-9   # m2/s
+a    = 120      # m2/m3
+x    = 2.0      # wt%
+```
+
+Compound units may be written with spaces, as above. Prose is still prose: a
+comment with a word that is not a unit in it — `# mass flow rate`, `# value in
+mol` — declares nothing.
+
+These all check out silently, which is the point:
+
+```python
+Re = rho * u * dia / mu                 # Reynolds
+Sc = mu / (rho * D_ab)                  # Schmidt
+Sh = kL * dia / D_ab                    # Sherwood
+k  = A * math.exp(-Ea / (cn.R * T))     # Arrhenius
+N_A = kG * p_A * a * Z                  # flux over a packed height
+nd = mdot / MW                          # molar flow from a mass flow
+```
+
+and these do not:
+
+```python
+math.exp(-Ea / T)        # exp needs a plain number, but this is in J/(mol·K)
+kG * p_A + C_A           # adds mol/(m²·s) and mol/m³
+mdot + n                 # adds kg/s and mol
+```
+
+Two things it will not do:
+
+- **°C and °F are left alone.** They are offset scales as well as scales, so
+  `T_c + 10` means something and `T_c * 2` does not. `# C` and `# F` therefore
+  declare nothing at all rather than being read as coulomb and farad, which in
+  a comment on a number they almost never are. Spell out `coulomb` and `farad`
+  for the electrical ones, and use kelvin for temperature.
+- **It checks kind, not size.** `Ea = 52.3  # kJ/mol` used in `exp(-Ea/(R*T))`
+  is wrong by a factor of a thousand and dimensionally perfect, so nothing is
+  reported. Switch on **Values** for that: the drawing shows the number, and a
+  Boltzmann factor of e^-0.019 is obvious on sight.
+
 A name whose units cannot be traced to one of those is left alone. `T = 300` on
 its own says nothing — the number could be kelvin, seconds or a count — so
 nothing is claimed about it and nothing is reported. This is deliberate: a check
