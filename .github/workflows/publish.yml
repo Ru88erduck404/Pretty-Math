@@ -5,21 +5,18 @@ name: Publish
 #
 #   git push origin main --follow-tags
 #
-# Publishing to the Marketplace authenticates with Microsoft Entra ID over
-# GitHub's OIDC, so there is no token to store or rotate: GitHub proves who it
-# is to Microsoft at the moment of the run. The personal access tokens that
-# used to do this job are retired on 1 December 2026.
+# The two halves are separate on purpose. Building the .vsix and attaching it
+# to a GitHub release needs nothing but the repository, and always happens.
+# Sending it to the Marketplace needs an identity, and is skipped when there
+# is not one -- a repository that has not been set up for publishing yet still
+# gets a green run and a downloadable build, rather than a red cross and no
+# release at all.
 #
-# Two repository variables are needed, neither of them a secret, because an
-# identity on its own grants nothing -- it only names who GitHub claims to be,
-# and Entra will only believe it for this repository's "release" environment:
-#
-#   AZURE_CLIENT_ID   the managed identity or app registration
-#   AZURE_TENANT_ID   the directory it lives in
-#
-# Set them under Settings > Secrets and variables > Actions > Variables, and
-# create the "release" environment under Settings > Environments. The identity
-# also has to be a Contributor on the Marketplace publisher; see RELEASING.md.
+# Setting the identity up is a one-time job, written down in RELEASING.md. In
+# short: a managed identity in Entra, a federated credential naming this
+# repository's "release" environment, AZURE_CLIENT_ID and AZURE_TENANT_ID as
+# repository variables, and that identity made a Contributor on the publisher.
+# The personal access tokens this used to want are retired on 1 December 2026.
 #
 # OVSX_PAT is unrelated and optional: Open VSX is run by the Eclipse
 # Foundation, keeps its own tokens, and is what VSCodium installs from.
@@ -35,14 +32,12 @@ on:
         default: false
 
 jobs:
-  publish:
+  # Everything that needs no credentials, so that it cannot be the thing that
+  # fails.
+  release:
     runs-on: ubuntu-latest
-    # The federated credential in Entra is bound to this environment, so a run
-    # from anywhere else cannot borrow the identity.
-    environment: release
     permissions:
       contents: write   # to create the GitHub release
-      id-token: write   # to request the OIDC token Entra checks
     env:
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
     steps:
@@ -76,6 +71,50 @@ jobs:
       - name: Build the .vsix
         run: npx --yes @vscode/vsce package --no-dependencies --out pretty-math.vsix
 
+      - name: Keep the build for the publishing job
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: pretty-math.vsix
+          retention-days: 7
+
+      - name: Attach the .vsix to the GitHub release
+        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
+        uses: softprops/action-gh-release@v2
+        with:
+          files: pretty-math.vsix
+          generate_release_notes: true
+
+      - name: Publish to Open VSX
+        if: ${{ env.OVSX_PAT != '' && !inputs.dry_run }}
+        run: npx --yes ovsx publish pretty-math.vsix --pat "$OVSX_PAT"
+
+      - name: Say whether the Marketplace step will run
+        run: |
+          if [ -n "${{ vars.AZURE_CLIENT_ID }}" ]; then
+            echo "An identity is configured; the Marketplace job follows."
+          else
+            echo "::notice::No AZURE_CLIENT_ID is set, so this build was not sent to"\
+                 "the Marketplace. The .vsix is attached to the release and can be"\
+                 "uploaded by hand. See RELEASING.md to set publishing up."
+          fi
+
+  # Only this half needs an identity, and only this half is skipped without
+  # one. The environment lives here so that no deployment is recorded for a
+  # publish that was never going to be attempted.
+  marketplace:
+    needs: release
+    if: vars.AZURE_CLIENT_ID != ''
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: read
+      id-token: write   # to request the OIDC token Entra checks
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: vsix
+
       - name: Sign in to Microsoft Entra ID
         uses: azure/login@v2
         with:
@@ -87,7 +126,7 @@ jobs:
 
       # Signing in only proves GitHub can authenticate as the identity. Whether
       # that identity may publish is a separate grant on the publisher, so it is
-      # worth failing here rather than halfway through a release.
+      # worth failing here rather than halfway through.
       - name: Check the identity may publish
         run: npx --yes @vscode/vsce verify-pat --azure-credential ru88erduck404
 
@@ -99,17 +138,6 @@ jobs:
             --url "https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=6.0" \
             --query id -o tsv
 
-      - name: Attach the .vsix to the GitHub release
-        if: startsWith(github.ref, 'refs/tags/') && !inputs.dry_run
-        uses: softprops/action-gh-release@v2
-        with:
-          files: pretty-math.vsix
-          generate_release_notes: true
-
       - name: Publish to the Visual Studio Marketplace
         if: ${{ !inputs.dry_run }}
         run: npx --yes @vscode/vsce publish --azure-credential --packagePath pretty-math.vsix
-
-      - name: Publish to Open VSX
-        if: ${{ env.OVSX_PAT != '' && !inputs.dry_run }}
-        run: npx --yes ovsx publish pretty-math.vsix --pat "$OVSX_PAT"
