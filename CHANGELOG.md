@@ -4,6 +4,29 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.3.1] — 2026-10-22
+
+### Fixed
+
+- More than one Maple call on a line. `int(f, x = 0 .. 1) + int(g, x = 0 .. 2)`
+  did nothing at all, and `int(int(f, y = 0 .. 1), x = 0 .. 1)` with it: a
+  pattern cannot tell where one call ends and the next begins, so brackets are
+  matched instead and arguments are rewritten before the call around them.
+- `limit(f, x = 0) + limit(g, x = 1)` was drawn as `(lim(→) f) + (lim(→) g)`,
+  having thrown away the variable and the point it approaches. A layout now
+  applies only when the arguments it needs are there, and falls back to the
+  plain call when they are not — losing part of a formula is worse than
+  drawing it plainly.
+- Two raised runs written next to each other no longer merge into one number.
+  `sqrt(v_0^2)^3` was drawn as `√v₀²³`, which reads as an exponent of
+  twenty-three; it is now `(√(v₀²))³`. A radical is bracketed unless a single
+  name or number follows it, since plain text has no bar to say where a root
+  ends: `√x²` says `(√x)²` and `√(x²)` equally well.
+- `(x^2)^3` and `exp(x)^2` produced `x^{2}^{3}` and `e^{x}^{2}`, which are not
+  LaTeX — a double superscript is an error, so the markdown cell rendered
+  nothing rather than something wrong. This also affected **Copy LaTeX** from
+  the panel.
+
 ## [0.3.0] — 2026-10-22
 
 ### Added

@@ -153,6 +153,171 @@ check('display maths is fenced on its own lines',
     maple.formatAsMath(src, 'latex'), null);
 });
 
+// --------------------------------------------------- more than one call
+
+// A pattern cannot tell where one call ends and the next begins. A greedy one
+// swallowed both of these whole and then quietly gave up; a lazy one would
+// stop at the first bracket inside the arguments. Brackets are matched instead.
+check('two ranged calls on one line',
+  maple.mapleToSource('int(f, x = 0 .. 1) + int(g, x = 0 .. 2)'),
+  'integrate(f, (x, 0, 1)) + integrate(g, (x, 0, 2))');
+check('and both of them draw',
+  uni('int(f, x = 0 .. 1) + int(g, x = 0 .. 2)'), '(∫₀¹ f dx) + (∫₀² g dx)');
+check('a ranged call inside another',
+  maple.mapleToSource('int(int(f, y = 0 .. 1), x = 0 .. 1)'),
+  'integrate(integrate(f, (y, 0, 1)), (x, 0, 1))');
+check('a double integral draws',
+  uni('int(int(f, y = 0 .. 1), x = 0 .. 1)'), '∫₀¹ ∫₀¹ f dy dx');
+check('two limits on one line',
+  uni('limit(f, x = 0) + limit(g, x = 1)'), '(lim(x→0) f) + (lim(x→1) g)');
+check('a ranged call with an assignment around it',
+  uni('A = int(f, x = 0 .. 1)'), 'A = ∫₀¹ f dx');
+// A name ending in one of these is not one of these.
+check('myint is not int', maple.mapleToSource('myint(f, x = 0 .. 1)'),
+  'myint(f, x = 0 .. 1)');
+check('and int(x) is the ordinary builtin',
+  uni('print(int(x))'), 'print(int(x))');
+check('a bracket inside a string does not unbalance the scan',
+  maple.mapleToSource('f("a)b", x)'), 'f("a)b", x)');
+
+// A layout only applies when the arguments it needs are there. `limit(f,
+// x = 0)` beside another call reaches the renderer with its range as a keyword
+// argument, and drawing it as `lim(→) f` threw the variable and the point
+// away: a formula replaced by a different, wrong formula.
+check('a limit missing its parts keeps them all',
+  uni('limit(f, x) + 1'), /x/);
+check('nothing is lost from a sum without a range',
+  uni('Sum(f) + 1'), /f/);
+
+// ------------------------------------------------ raised runs must not merge
+
+// √v₀² cubed is not √v₀²³: two raised runs written next to each other read as
+// one number.
+check('a power on a base that already ends raised',
+  uni('sqrt(v_0^2)^3'), '(√(v₀²))³');
+check('a power on an exponential', uni('exp(x)^2'), '(eˣ)²');
+check('a power of a power', uni('(x^2)^3'), '(x²)³');
+check('which is not the same as a tower', uni('x^2^3'), 'x^(2³)');
+// A radical has no bar in plain text, so only a single name or number can
+// follow it unbracketed.
+check('a root of a power is bracketed', uni('sqrt(x^2)'), '√(x²)');
+check('a root raised to a power is bracketed', uni('sqrt(x)^2'), '(√x)²');
+check('a root of a sum stays bracketed', uni('sqrt(a + b)'), '√(a + b)');
+check('a plain root needs none', uni('sqrt(x)'), '√x');
+check('nor does a root of a number', uni('sqrt(2)'), '√2');
+check('nor one of a subscripted name', uni('sqrt(v_0)'), '√v₀');
+
+// The same shapes in LaTeX, where a double superscript is not merely
+// ambiguous: `x^{2}^{3}` is an error, and the cell renders nothing at all.
+check('a power of a power is bracketed in latex',
+  tex('(x^2)^3'), /\\left\(x\^\{2\}\\right\)\^\{3\}/);
+check('and an exponential raised to a power',
+  tex('exp(x)^2'), /\\left\(e\^\{x\}\\right\)\^\{2\}/);
+check('no latex output carries a double superscript', (function () {
+  const shapes = ['(x^2)^3', 'exp(x)^2', '((x^2)^3)^4', '2^2^2', 'x^2^3',
+    'sqrt(x)^2', '(1/x)^2', 'exp(exp(x))', '(a^b)^c'];
+  const bad = shapes.filter(function (s) {
+    return /\^\{[^{}]*\}\^/.test(String(tex(s)));
+  });
+  return bad.join(',') || 'none';
+})(), 'none');
+
+// ------------------------------------------------- the drawing means the same
+
+// Rendering only goes one way, so this turns the Unicode back into ordinary
+// source and compares the two as numbers. A lost bracket shows up as a
+// different answer; nothing else does.
+const SUPER_BACK = { '⁰':'0','¹':'1','²':'2','³':'3','⁴':'4','⁵':'5','⁶':'6','⁷':'7',
+  '⁸':'8','⁹':'9','⁺':'+','⁻':'-','⁽':'(','⁾':')','ⁿ':'n','ⁱ':'i','ᵃ':'a','ᵇ':'b',
+  'ᶜ':'c','ᵈ':'d','ᵉ':'e','ᶠ':'f','ᵍ':'g','ʰ':'h','ʲ':'j','ᵏ':'k','ˡ':'l','ᵐ':'m',
+  'ᵒ':'o','ᵖ':'p','ʳ':'r','ˢ':'s','ᵗ':'t','ᵘ':'u','ᵛ':'v','ʷ':'w','ˣ':'x','ʸ':'y','ᶻ':'z' };
+const SUB_BACK = { '₀':'0','₁':'1','₂':'2','₃':'3','₄':'4','₅':'5','₆':'6','₇':'7',
+  '₈':'8','₉':'9','ₐ':'a','ₑ':'e','ₕ':'h','ᵢ':'i','ⱼ':'j','ₖ':'k','ₗ':'l','ₘ':'m',
+  'ₙ':'n','ₒ':'o','ₚ':'p','ᵣ':'r','ₛ':'s','ₜ':'t','ᵤ':'u','ᵥ':'v','ₓ':'x' };
+const GREEK_BACK = { 'α':'alpha','β':'beta','θ':'theta','μ':'mu','ρ':'rho',
+  'σ':'sigma','ω':'omega' };
+
+function unUnicode(text) {
+  let s = String(text);
+  s = s.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁽⁾ⁿⁱᵃᵇᶜᵈᵉᶠᵍʰʲᵏˡᵐᵒᵖʳˢᵗᵘᵛʷˣʸᶻ]+/g, function (run) {
+    let plain = '';
+    for (const ch of run) plain += SUPER_BACK[ch];
+    return '**(' + plain + ')';
+  });
+  s = s.replace(/[₀₁₂₃₄₅₆₇₈₉ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ]+/g, function (run) {
+    let plain = '';
+    for (const ch of run) plain += SUB_BACK[ch];
+    return '_' + plain;
+  });
+  s = s.replace(/√/g, 'sqrt@').replace(/·/g, '*').replace(/−/g, '-').replace(/π/g, 'pi');
+  Object.keys(GREEK_BACK).forEach(function (g) { s = s.split(g).join(GREEK_BACK[g]); });
+  for (let pass = 0; pass < 20 && s.indexOf('sqrt@') >= 0; pass++) {
+    const next = s.replace(/sqrt@\(/g, 'sqrt(')
+      .replace(/sqrt@(sqrt\((?:[^()]|\([^()]*\))*\))/g, 'sqrt($1)')
+      .replace(/sqrt@([A-Za-z_]\w*|\d+(?:\.\d+)?)/g, 'sqrt($1)');
+    if (next === s) break;
+    s = next;
+  }
+  return s;
+}
+
+const { parse } = require('../src/parser');
+const { evaluate } = require('../src/evaluate');
+
+let seed = Number(process.env.PRETTY_MATH_SEED || 20261022);
+function rnd() { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; }
+function pick(a) { return a[Math.floor(rnd() * a.length) % a.length]; }
+
+const VARS = ['a', 'b', 'c', 'x', 'y', 'alpha', 'beta', 'theta', 'v_0', 'sigma'];
+const ENV = {};
+VARS.forEach(function (n, i) { ENV[n] = 1 + ((i * 7 + 3) % 11) * 0.37; });
+ENV.pi = Math.PI;
+
+function randomExpr(depth) {
+  if (depth <= 0 || rnd() < 0.3) {
+    return rnd() < 0.5 ? pick(VARS) : pick(['1', '2', '3', '0.5', '7', '1.5']);
+  }
+  const roll = rnd();
+  if (roll < 0.52) {
+    const op = pick(['+', '-', '*', '/', '**']);
+    const right = op === '**' ? pick(['2', '3', '2']) : randomExpr(depth - 1);
+    return randomExpr(depth - 1) + ' ' + op + ' ' + right;
+  }
+  if (roll < 0.66) return '(' + randomExpr(depth - 1) + ')';
+  if (roll < 0.80) return '-' + randomExpr(depth - 1);
+  return 'sqrt(' + randomExpr(depth - 1) + ')';
+}
+
+function valueOf(src) {
+  try {
+    return evaluate(parse(src, { caretIsPower: true }), ENV, new Set(), {});
+  } catch (err) {
+    return undefined;
+  }
+}
+
+let compared = 0;
+const wrong = [];
+for (let i = 0; i < 3000; i++) {
+  const src = randomExpr(3);
+  const drawn = maple.formatAsMath(src, 'unicode');
+  if (drawn === null) continue;
+  const a = valueOf(src);
+  if (a === null || a === undefined || !Number.isFinite(a)) continue;
+  const b = valueOf(unUnicode(drawn));
+  if (b === null || b === undefined || !Number.isFinite(b)) {
+    wrong.push(src + '  ->  ' + drawn + '  ->  ' + unUnicode(drawn));
+    continue;
+  }
+  compared++;
+  if (Math.abs(a - b) / Math.max(1, Math.abs(a), Math.abs(b)) > 1e-9) {
+    wrong.push(src + '  ->  ' + drawn + '   (' + a + ' vs ' + b + ')');
+  }
+}
+wrong.slice(0, 5).forEach(function (w) { console.log('  MEANING CHANGED  ' + w); });
+check('the drawing means what was typed, over ' + compared + ' expressions',
+  wrong.length, 0);
+
 // ---------------------------------------------------------------- hostile
 
 // The same text an attacker or a stray paste might put in front of it.

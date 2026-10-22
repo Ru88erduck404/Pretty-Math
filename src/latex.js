@@ -439,7 +439,13 @@ function toLatex(node, opts) {
             }
           }
           const base = go(n.l);
-          const needs = base.prec < POWER || n.l.type === 'Binary' && (n.l.op === '/' || n.l.op === '//');
+          // A base that is itself a power needs the brackets twice over: `**`
+          // groups to the right, so (x**2)**3 is a different number from
+          // x**2**3, and `x^{2}^{3}` is not LaTeX at all -- a double
+          // superscript is an error, so the line would fail to render rather
+          // than render wrongly.
+          const needs = base.prec <= POWER ||
+            (n.l.type === 'Binary' && (n.l.op === '/' || n.l.op === '//'));
           const b = needs ? '\\left(' + base.tex + '\\right)' : base.tex;
           return res(b + '^{' + go(n.r).tex + '}', POWER);
         }

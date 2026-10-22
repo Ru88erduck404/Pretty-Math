@@ -107,39 +107,87 @@ function completionsFor(prefix) {
 const RANGED = { int: 'integrate', Int: 'integrate', sum: 'Sum', Sum: 'Sum',
   add: 'Sum', product: 'Product', Product: 'Product', mul: 'Product' };
 
+// The closing bracket matching the one at `open`, or -1 when there is none.
+// Quoted text is skipped, so a bracket inside a string cannot unbalance it.
+function matchBracket(text, open) {
+  const pairs = { '(': ')', '[': ']', '{': '}' };
+  let depth = 0;
+  let quote = null;
+  for (let i = open; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === '\\') i++;
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") { quote = c; continue; }
+    if (pairs[c]) depth++;
+    else if (c === ')' || c === ']' || c === '}') {
+      depth--;
+      if (depth === 0) return i;
+      if (depth < 0) return -1;
+    }
+  }
+  return -1;
+}
+
+// Rewrites Maple's call forms into the ones the parser reads.
+//
+// This walks the text and matches brackets rather than pattern-matching it,
+// because a pattern cannot tell where one call ends and the next begins: a
+// greedy one swallowed `int(f, x = 0 .. 1) + int(g, x = 0 .. 2)` whole, and a
+// lazy one would stop at the first bracket inside the arguments. Arguments are
+// rewritten before the call around them, so nesting works at any depth.
 function mapleToSource(text) {
-  let out = String(text);
+  const source = String(text);
+  let out = '';
+  let i = 0;
 
-  // int(f, x = 0 .. 1)  ->  integrate(f, (x, 0, 1))
-  // sum(f, i = 1 .. n)  ->  Sum(f, (i, 1, n))
-  out = out.replace(
-    /\b(int|Int|sum|Sum|add|product|Product|mul)\s*\(([\s\S]*)\)/g,
-    function (whole, fn, inside) {
-      const args = splitArgs(inside);
-      if (args.length !== 2) return whole;
-      const ranged = /^([A-Za-z_]\w*)\s*=\s*([\s\S]+?)\s*\.\.\s*([\s\S]+)$/.exec(args[1]);
-      if (ranged) {
-        return RANGED[fn] + '(' + args[0] + ', (' + ranged[1] + ', ' +
-          ranged[2] + ', ' + ranged[3] + '))';
-      }
-      // int(f, x) is an indefinite integral, which the renderer knows as
-      // integrate(f, x); a sum without a range has no layout of its own.
-      if (fn === 'int' || fn === 'Int') return 'integrate(' + args[0] + ', ' + args[1] + ')';
-      return whole;
-    });
+  while (i < source.length) {
+    const ahead = /^([A-Za-z_]\w*)\s*\(/.exec(source.slice(i));
+    // A name directly after another name-character is the tail of a longer
+    // name: `myint(...)` is not `int(...)`.
+    const joined = i > 0 && /[\w$.]/.test(source[i - 1]);
+    if (!ahead || joined) { out += source[i]; i++; continue; }
 
-  // limit(f, x = 0)  ->  limit(f, x, 0)
-  out = out.replace(/\blimit\s*\(([\s\S]*)\)/g, function (whole, inside) {
-    const args = splitArgs(inside);
-    if (args.length !== 2) return whole;
+    const open = i + ahead[0].length - 1;
+    const close = matchBracket(source, open);
+    if (close < 0) { out += source[i]; i++; continue; }
+
+    const inside = mapleToSource(source.slice(open + 1, close));
+    out += rewriteCall(ahead[1], inside);
+    i = close + 1;
+  }
+
+  // Maple spells these with a capital, and in full.
+  return out.replace(/\bPi\b/g, 'pi').replace(/\binfinity\b/g, 'oo');
+}
+
+// One call, with its arguments already rewritten.
+function rewriteCall(fn, inside) {
+  const plain = fn + '(' + inside + ')';
+  const args = splitArgs(inside);
+
+  if (Object.prototype.hasOwnProperty.call(RANGED, fn)) {
+    if (args.length !== 2) return plain;
+    const ranged = /^([A-Za-z_]\w*)\s*=\s*([\s\S]+?)\s*\.\.\s*([\s\S]+)$/.exec(args[1]);
+    if (ranged) {
+      return RANGED[fn] + '(' + args[0] + ', (' + ranged[1] + ', ' +
+        ranged[2] + ', ' + ranged[3] + '))';
+    }
+    // int(f, x) is an indefinite integral, which the renderer knows as
+    // integrate(f, x); a sum without a range has no layout of its own.
+    if (fn === 'int' || fn === 'Int') return 'integrate(' + args[0] + ', ' + args[1] + ')';
+    return plain;
+  }
+
+  if (fn === 'limit' || fn === 'Limit') {
+    if (args.length !== 2) return plain;
     const at = /^([A-Za-z_]\w*)\s*=\s*([\s\S]+)$/.exec(args[1]);
-    return at ? 'limit(' + args[0] + ', ' + at[1] + ', ' + at[2] + ')' : whole;
-  });
+    return at ? 'limit(' + args[0] + ', ' + at[1] + ', ' + at[2] + ')' : plain;
+  }
 
-  // Maple spells these with a capital, and `&` marks a few operators.
-  out = out.replace(/\bPi\b/g, 'pi').replace(/\binfinity\b/g, 'oo');
-
-  return out;
+  return plain;
 }
 
 // Splits on the commas that are at the top level, so a nested call keeps its
@@ -175,6 +223,15 @@ const SUB = {
   'k': 'ₖ', 'l': 'ₗ', 'm': 'ₘ', 'n': 'ₙ', 'o': 'ₒ', 'p': 'ₚ', 'r': 'ᵣ',
   's': 'ₛ', 't': 'ₜ', 'u': 'ᵤ', 'v': 'ᵥ', 'x': 'ₓ'
 };
+
+// Anything already sitting above the line. Two raised runs written next to
+// each other merge into one: √v₀²  cubed must not come out as √v₀²³, which
+// reads as an exponent of twenty-three.
+const RAISED = /[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾ⁿⁱᵃᵇᶜᵈᵉᶠᵍʰʲᵏˡᵐᵒᵖʳˢᵗᵘᵛʷˣʸᶻ·]$/;
+
+// A single thing, which a radical sign can sit in front of without a bar to
+// say where it ends: a name, a number, or either with a subscript.
+const SIMPLE = /^[A-Za-zΑ-Ωα-ωϑ∞π0-9._₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ]+$/;
 
 // Unicode has no superscript q, and no subscript for half the alphabet, so a
 // raised form is all-or-nothing: either every character has one or the whole
@@ -281,7 +338,13 @@ function toUnicode(node, options) {
       // xⁿ ⁺ ¹, which no font would set well even if the spaces existed.
       const exp = go(n.r).text;
       const up = raise(exp.replace(/\s+/g, ''), SUPER);
-      return up ? { text: base + up, prec: ATOM } : { text: base + '^(' + exp + ')', prec: ATOM };
+      if (!up) return { text: base + '^(' + exp + ')', prec: ATOM };
+      // A base that already ends above the line gets brackets, or the two
+      // raised runs would be read as one number. So does one that opens with a
+      // radical: without a bar to close it, √x² says (√x)² and √(x²) equally
+      // well, and only one of them is meant.
+      const guard = RAISED.test(base) || /^[√∛]/.test(base);
+      return { text: (guard ? '(' + base + ')' : base) + up, prec: ATOM };
     }
 
     const glyph = op === '*' ? '·' : op === '-' ? ' − ' : op === '+' ? ' + ' :
@@ -303,24 +366,43 @@ function toUnicode(node, options) {
     const spec = fn ? S.FUNCTIONS[fn] : null;
     const text = function (i) { return args[i] ? go(args[i]).text : ''; };
 
+    // A layout only applies when the arguments it needs are actually there.
+    // `limit(f, x = 0) + limit(g, x = 1)` arrives with the range as a keyword
+    // argument rather than a positional one, and drawing it as `lim(→) f`
+    // would quietly throw away the variable and the point -- a formula
+    // replaced by a different, wrong formula. Falling back to the plain call
+    // keeps every part of it.
     if (spec) {
       switch (spec.kind) {
-        case 'sqrt':
-          return { text: (spec.index === '3' ? '∛' : '√') + operand(args[0], ATOM), prec: ATOM };
+        case 'sqrt': {
+          if (!args[0]) break;
+          // On paper the bar says where the root ends. Without one, only a
+          // single name or number can follow the sign unbracketed: √v₀² would
+          // otherwise be read as (√v₀)² just as readily as √(v₀²).
+          const inner = go(args[0]).text;
+          const sign = spec.index === '3' ? '∛' : '√';
+          return { text: sign + (SIMPLE.test(inner) ? inner : '(' + inner + ')'), prec: ATOM };
+        }
         case 'fence':
+          if (!args[0]) break;
           return { text: spec.open + text(0) + spec.close, prec: ATOM };
         case 'exp': {
-          const up = raise(text(0), SUPER);
+          if (!args[0]) break;
+          const up = raise(text(0).replace(/\s+/g, ''), SUPER);
           return up ? { text: 'e' + up, prec: ATOM }
             : { text: 'e^(' + text(0) + ')', prec: ATOM };
         }
         case 'integral':
+          if (!args[0]) break;
           return { text: integral(args), prec: 2 };
         case 'bigsum':
+          if (!args[0] || !limits(args[1])) break;
           return { text: bigop(spec.glyph, args), prec: 2 };
         case 'derivative':
+          if (!args[0] || !args[1]) break;
           return { text: derivative(args), prec: 2 };
         case 'limit':
+          if (args.length < 3) break;
           return { text: 'lim(' + text(1) + '→' + text(2) + ') ' + text(0), prec: 2 };
         default:
           break;
