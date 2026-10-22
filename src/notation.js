@@ -1,13 +1,13 @@
 'use strict';
 
-// Typing maths the way Maple lets you type it: names become symbols as you
-// write them, and a line of ordinary input becomes typeset maths on command.
+// Typing maths as ordinary text: names become symbols as you write them, and
+// a line of input becomes typeset maths on command.
 //
-// Nothing here parses. Maple's input syntax is rewritten into the form the
-// existing parser already reads, and the result is handed to the LaTeX writer
-// that already exists or to the one new thing this file does add: a renderer
-// that lays an expression out in plain Unicode, for the places where LaTeX
-// would only be read as literal backslashes.
+// Nothing here parses. The calculator-style call forms are rewritten into the
+// shapes the existing parser already reads, and the result is handed either to
+// the LaTeX writer that already exists or to the one new thing this file does
+// add: a renderer that lays an expression out in plain Unicode, for the places
+// where LaTeX would only ever be read as literal backslashes.
 
 const S = require('./symbols');
 const { parse, PREC, dottedName } = require('./parser');
@@ -96,11 +96,12 @@ function completionsFor(prefix) {
   return out.sort(function (a, b) { return a.name.length - b.name.length; });
 }
 
-// ------------------------------------------------------- the Maple dialect
+// ----------------------------------------------------- the input dialect
 
-// Maple writes a range as `x = a .. b` and spells a few things its own way.
-// Rewriting those into the shapes the parser already understands is far less
-// work than teaching it a second syntax, and keeps one grammar to maintain.
+// Calculators and computer-algebra systems write a range as `x = a .. b`, and
+// spell a few names their own way. Rewriting those into the shapes the parser
+// already understands is far less work than teaching it a second syntax, and
+// keeps one grammar to maintain.
 //
 // Only the calls that have a layout of their own are rewritten; everything
 // else is already ordinary expression syntax and passes through untouched.
@@ -131,14 +132,14 @@ function matchBracket(text, open) {
   return -1;
 }
 
-// Rewrites Maple's call forms into the ones the parser reads.
+// Rewrites the dialect's call forms into the ones the parser reads.
 //
 // This walks the text and matches brackets rather than pattern-matching it,
 // because a pattern cannot tell where one call ends and the next begins: a
 // greedy one swallowed `int(f, x = 0 .. 1) + int(g, x = 0 .. 2)` whole, and a
 // lazy one would stop at the first bracket inside the arguments. Arguments are
 // rewritten before the call around them, so nesting works at any depth.
-function mapleToSource(text) {
+function toParserSyntax(text) {
   const source = String(text);
   let out = '';
   let i = 0;
@@ -154,12 +155,12 @@ function mapleToSource(text) {
     const close = matchBracket(source, open);
     if (close < 0) { out += source[i]; i++; continue; }
 
-    const inside = mapleToSource(source.slice(open + 1, close));
+    const inside = toParserSyntax(source.slice(open + 1, close));
     out += rewriteCall(ahead[1], inside);
     i = close + 1;
   }
 
-  // Maple spells these with a capital, and in full.
+  // These are spelled with a capital, and in full, in that dialect.
   return out.replace(/\bPi\b/g, 'pi').replace(/\binfinity\b/g, 'oo');
 }
 
@@ -462,7 +463,7 @@ function toUnicode(node, options) {
 
 // ------------------------------------------------------------- the command
 
-// Formats one line of Maple-ish input. `target` is 'latex' where the result
+// Formats one line of input. `target` is 'latex' where the result
 // will be rendered as maths -- a notebook's markdown cell, a .md file -- and
 // 'unicode' everywhere else, where backslashes would only ever be read as
 // backslashes.
@@ -471,10 +472,10 @@ function toUnicode(node, options) {
 // alone rather than replacing it with something worse.
 function formatAsMath(text, target, options) {
   const o = options || {};
-  const source = mapleToSource(text);
+  const source = toParserSyntax(text);
   let ast;
   try {
-    ast = parse(source, { caretIsPower: true, id: 'maple' });
+    ast = parse(source, { caretIsPower: true, id: 'notation' });
   } catch (err) {
     return null;
   }
@@ -499,7 +500,7 @@ module.exports = {
   SYMBOLS: SYMBOLS,
   expandAt: expandAt,
   completionsFor: completionsFor,
-  mapleToSource: mapleToSource,
+  toParserSyntax: toParserSyntax,
   toUnicode: toUnicode,
   formatAsMath: formatAsMath,
   splitArgs: splitArgs

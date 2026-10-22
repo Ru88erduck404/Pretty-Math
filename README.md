@@ -233,8 +233,9 @@ by default.
 
 ### A line becomes typeset maths
 
-**Alt+M** formats the selection, or the line the cursor is on. It reads Maple's
-input syntax, and writes whichever form the file can actually show:
+**Alt+M** formats the selection, or the line the cursor is on. It reads the
+calculator-style syntax below, and writes whichever form the file can actually
+show:
 
 | you type | in a `.py` file | in a markdown cell |
 | --- | --- | --- |
@@ -253,9 +254,10 @@ dollars and stays inline. Everywhere else — a `.py` file, a comment, a plain
 text file — it writes Unicode, because a backslash in those is only ever read
 as a backslash.
 
-The Maple forms it understands are `int(f, x = a .. b)`, `int(f, x)`,
+The call forms it understands are `int(f, x = a .. b)`, `int(f, x)`,
 `sum`/`product` over a range, `diff(y, x, n)`, `limit(f, x = a)`, `sqrt`,
-`abs`, `exp`, `Pi` and `infinity`. Everything else is ordinary expression
+`abs`, `exp`, `Pi` and `infinity` — a range written `x = a .. b`, as a
+computer-algebra system writes it. Everything else is ordinary expression
 syntax and needs no translation.
 
 A raised form is all or nothing: Unicode has no superscript `q` and no

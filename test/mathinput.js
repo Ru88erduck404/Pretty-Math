@@ -5,7 +5,7 @@
 // that nothing happens to text which is not a formula -- a formatter that
 // mangles what it cannot read is one you stop reaching for.
 
-const maple = require('../src/maple');
+const notation = require('../src/notation');
 
 // A backslash, built rather than written, so that the escaping in this file
 // never has to be read twice to be believed.
@@ -24,7 +24,7 @@ function check(name, actual, expected) {
 
 // What typing `line` and putting the cursor at its end would produce.
 function typed(line) {
-  const found = maple.expandAt(line, line.length);
+  const found = notation.expandAt(line, line.length);
   if (!found) return null;
   return line.slice(0, found.start) + found.text + line.slice(found.end);
 }
@@ -56,46 +56,47 @@ check('an unknown name', typed(B + 'frobnicate'), null);
 // Only the text before the cursor counts: what comes after is not being typed.
 check('text after the cursor is untouched', (function () {
   const line = B + 'alpha + beta';
-  const found = maple.expandAt(line, 6);
+  const found = notation.expandAt(line, 6);
   return found ? line.slice(0, found.start) + found.text + line.slice(found.end) : null;
 })(), 'α + beta');
 
 // ------------------------------------------------------------- completions
 
 check('completions for a prefix', (function () {
-  const names = maple.completionsFor('alph').map(function (c) { return c.name; });
+  const names = notation.completionsFor('alph').map(function (c) { return c.name; });
   return names.join(',');
 })(), 'alpha');
 check('a prefix with several answers offers the shortest first',
-  maple.completionsFor('le')[0].name, 'le');
+  notation.completionsFor('le')[0].name, 'le');
 check('every completion carries its symbol',
-  maple.completionsFor('').every(function (c) { return !!c.symbol; }), true);
-check('an unknown prefix offers nothing', maple.completionsFor('zzz').length, 0);
+  notation.completionsFor('').every(function (c) { return !!c.symbol; }), true);
+check('an unknown prefix offers nothing', notation.completionsFor('zzz').length, 0);
 
-// ------------------------------------------------------ the Maple dialect
+// ----------------------------------------------------- the input dialect
 
-// Maple writes a range as `x = a .. b`. Rewriting it into the shape the parser
-// already reads is why none of this needed a second grammar.
+// A range is written `x = a .. b`, as a calculator writes it. Rewriting that
+// into the shape the parser already reads is why none of this needed a second
+// grammar.
 check('a definite integral',
-  maple.mapleToSource('int(f, x = 0 .. 1)'), 'integrate(f, (x, 0, 1))');
+  notation.toParserSyntax('int(f, x = 0 .. 1)'), 'integrate(f, (x, 0, 1))');
 check('an indefinite integral',
-  maple.mapleToSource('int(x^2, x)'), 'integrate(x^2, x)');
-check('a sum', maple.mapleToSource('sum(1/i^2, i = 1 .. n)'), 'Sum(1/i^2, (i, 1, n))');
-check('a product', maple.mapleToSource('product(k, k = 1 .. n)'), 'Product(k, (k, 1, n))');
-check('a limit', maple.mapleToSource('limit(sin(x)/x, x = 0)'), 'limit(sin(x)/x, x, 0)');
+  notation.toParserSyntax('int(x^2, x)'), 'integrate(x^2, x)');
+check('a sum', notation.toParserSyntax('sum(1/i^2, i = 1 .. n)'), 'Sum(1/i^2, (i, 1, n))');
+check('a product', notation.toParserSyntax('product(k, k = 1 .. n)'), 'Product(k, (k, 1, n))');
+check('a limit', notation.toParserSyntax('limit(sin(x)/x, x = 0)'), 'limit(sin(x)/x, x, 0)');
 check('a derivative is already in the right shape',
-  maple.mapleToSource('diff(y, x)'), 'diff(y, x)');
-check('Maple spells pi with a capital', maple.mapleToSource('Pi*r^2'), 'pi*r^2');
-check('and infinity in full', maple.mapleToSource('1/infinity'), '1/oo');
-check('an ordinary call is left alone', maple.mapleToSource('f(a, b)'), 'f(a, b)');
+  notation.toParserSyntax('diff(y, x)'), 'diff(y, x)');
+check('pi is spelled with a capital', notation.toParserSyntax('Pi*r^2'), 'pi*r^2');
+check('and infinity in full', notation.toParserSyntax('1/infinity'), '1/oo');
+check('an ordinary call is left alone', notation.toParserSyntax('f(a, b)'), 'f(a, b)');
 check('a nested call keeps its own arguments',
-  maple.mapleToSource('int(f(x, y), x = a .. b)'), 'integrate(f(x, y), (x, a, b))');
+  notation.toParserSyntax('int(f(x, y), x = a .. b)'), 'integrate(f(x, y), (x, a, b))');
 check('arguments split at the top level only',
-  maple.splitArgs('f(a, b), x = 0 .. 1').length, 2);
+  notation.splitArgs('f(a, b), x = 0 .. 1').length, 2);
 
 // --------------------------------------------------------- unicode output
 
-function uni(src) { return maple.formatAsMath(src, 'unicode'); }
+function uni(src) { return notation.formatAsMath(src, 'unicode'); }
 
 check('a power', uni('x^2'), 'x²');
 check('a power with a sum in it', uni('x^(n+1)'), 'xⁿ⁺¹');
@@ -126,7 +127,7 @@ check('a limit that cannot be raised is still legible',
 
 // ----------------------------------------------------------- latex output
 
-function tex(src, opts) { return maple.formatAsMath(src, 'latex', opts); }
+function tex(src, opts) { return notation.formatAsMath(src, 'latex', opts); }
 
 check('inline latex', tex('x^2 + y^2'), '$x^{2} + y^{2}$');
 check('a fraction', tex('(a+b)/(c+d)'), '$\\frac{a + b}{c + d}$');
@@ -148,9 +149,9 @@ check('display maths is fenced on its own lines',
 ['', '   ', 'the quick brown fox', 'x = ', ')(', 'f(', '# a comment',
  '| a | table |', '- a bullet'].forEach(function (src) {
   check('nothing is made of ' + JSON.stringify(src) + ' as unicode',
-    maple.formatAsMath(src, 'unicode'), null);
+    notation.formatAsMath(src, 'unicode'), null);
   check('nothing is made of ' + JSON.stringify(src) + ' as latex',
-    maple.formatAsMath(src, 'latex'), null);
+    notation.formatAsMath(src, 'latex'), null);
 });
 
 // --------------------------------------------------- more than one call
@@ -159,12 +160,12 @@ check('display maths is fenced on its own lines',
 // swallowed both of these whole and then quietly gave up; a lazy one would
 // stop at the first bracket inside the arguments. Brackets are matched instead.
 check('two ranged calls on one line',
-  maple.mapleToSource('int(f, x = 0 .. 1) + int(g, x = 0 .. 2)'),
+  notation.toParserSyntax('int(f, x = 0 .. 1) + int(g, x = 0 .. 2)'),
   'integrate(f, (x, 0, 1)) + integrate(g, (x, 0, 2))');
 check('and both of them draw',
   uni('int(f, x = 0 .. 1) + int(g, x = 0 .. 2)'), '(∫₀¹ f dx) + (∫₀² g dx)');
 check('a ranged call inside another',
-  maple.mapleToSource('int(int(f, y = 0 .. 1), x = 0 .. 1)'),
+  notation.toParserSyntax('int(int(f, y = 0 .. 1), x = 0 .. 1)'),
   'integrate(integrate(f, (y, 0, 1)), (x, 0, 1))');
 check('a double integral draws',
   uni('int(int(f, y = 0 .. 1), x = 0 .. 1)'), '∫₀¹ ∫₀¹ f dy dx');
@@ -173,12 +174,12 @@ check('two limits on one line',
 check('a ranged call with an assignment around it',
   uni('A = int(f, x = 0 .. 1)'), 'A = ∫₀¹ f dx');
 // A name ending in one of these is not one of these.
-check('myint is not int', maple.mapleToSource('myint(f, x = 0 .. 1)'),
+check('myint is not int', notation.toParserSyntax('myint(f, x = 0 .. 1)'),
   'myint(f, x = 0 .. 1)');
 check('and int(x) is the ordinary builtin',
   uni('print(int(x))'), 'print(int(x))');
 check('a bracket inside a string does not unbalance the scan',
-  maple.mapleToSource('f("a)b", x)'), 'f("a)b", x)');
+  notation.toParserSyntax('f("a)b", x)'), 'f("a)b", x)');
 
 // A layout only applies when the arguments it needs are there. `limit(f,
 // x = 0)` beside another call reaches the renderer with its range as a keyword
@@ -300,7 +301,7 @@ let compared = 0;
 const wrong = [];
 for (let i = 0; i < 3000; i++) {
   const src = randomExpr(3);
-  const drawn = maple.formatAsMath(src, 'unicode');
+  const drawn = notation.formatAsMath(src, 'unicode');
   if (drawn === null) continue;
   const a = valueOf(src);
   if (a === null || a === undefined || !Number.isFinite(a)) continue;
@@ -334,9 +335,9 @@ let held = 0;
 NASTY.forEach(function (src) {
   const started = Date.now();
   try {
-    maple.formatAsMath(src, 'unicode');
-    maple.formatAsMath(src, 'latex');
-    maple.expandAt(src, src.length);
+    notation.formatAsMath(src, 'unicode');
+    notation.formatAsMath(src, 'latex');
+    notation.expandAt(src, src.length);
     if (Date.now() - started < 2000) held++;
     else console.log('SLOW on input of ' + src.length + ' characters');
   } catch (err) {
@@ -351,7 +352,7 @@ check('hostile input is handled quickly and without throwing', held, NASTY.lengt
 // behaviour that matters, whichever way it is reached.
 ['x^2 + y^2', 'alpha*beta', 'v_0*t', 'sqrt(2)'].forEach(function (src) {
   const once = uni(src);
-  const twice = maple.formatAsMath(once, 'unicode');
+  const twice = notation.formatAsMath(once, 'unicode');
   check('formatting ' + JSON.stringify(src) + ' twice changes nothing further',
     twice === null || twice === once, true);
 });

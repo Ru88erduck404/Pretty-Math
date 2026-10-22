@@ -4,11 +4,21 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.3.2] — 2026-10-22
+
+### Changed
+
+- The math-input source file and the names inside it no longer refer to the
+  computer-algebra system whose input syntax inspired them. That name belongs
+  to its owner, and nothing here is connected with them; the syntax is
+  described for what it is instead — a range written `x = a .. b`, as a
+  calculator writes it. No behaviour changes.
+
 ## [0.3.1] — 2026-10-22
 
 ### Fixed
 
-- More than one Maple call on a line. `int(f, x = 0 .. 1) + int(g, x = 0 .. 2)`
+- More than one of the dialect's calls on a line. `int(f, x = 0 .. 1) + int(g, x = 0 .. 2)`
   did nothing at all, and `int(int(f, y = 0 .. 1), x = 0 .. 1)` with it: a
   pattern cannot tell where one call ends and the next begins, so brackets are
   matched instead and arguments are rewritten before the call around them.
@@ -31,8 +41,7 @@ All notable changes to Pretty Math are recorded here. The format follows
 
 ### Added
 
-- **Typing maths, the way Maple lets you type it.** Two halves, both off until
-  asked for.
+- **Typing maths as ordinary text.** Two halves, both off until asked for.
 
   **Alt+Shift+M** turns on symbol input: `\alpha` becomes α, `\int` becomes ∫,
   `\le` becomes ≤, with completions offered as you type. The name is replaced
@@ -41,7 +50,7 @@ All notable changes to Pretty Math are recorded here. The format follows
   with it. Nothing without a leading backslash is ever touched, which is what
   makes it safe to leave on: no word in prose or in code begins with one.
 
-  **Alt+M** turns a line of Maple-ish input into typeset maths. In a notebook's
+  **Alt+M** turns a line of calculator-style input into typeset maths. In a notebook's
   markdown cell, a `.md` file or a LaTeX document it writes LaTeX between
   dollar signs — a formula alone on its line displayed between `$$`, one inside
   a sentence kept inline — because that is what those render. Everywhere else

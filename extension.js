@@ -4,7 +4,7 @@ const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
 const { collectValues, valuesFromDebugger, mathAliases, importModules } = require('./src/values');
 const { collectUnits } = require('./src/units');
-const maple = require('./src/maple');
+const notation = require('./src/notation');
 const { formatNumber } = require('./src/evaluate');
 const { readKernelValues } = require('./src/jupyter');
 
@@ -569,7 +569,7 @@ function expandOnType(event) {
 
   const at = change.range.start;
   const line = event.document.lineAt(at.line).text;
-  const found = maple.expandAt(line, at.character);
+  const found = notation.expandAt(line, at.character);
   if (!found) return;
 
   // A space was only ever a delimiter, so it goes with the name it ended.
@@ -600,7 +600,7 @@ const mathInputCompletions = {
       new vscode.Position(position.line, position.character - started[0].length),
       position);
 
-    return maple.completionsFor(started[1]).slice(0, 200).map(function (item, i) {
+    return notation.completionsFor(started[1]).slice(0, 200).map(function (item, i) {
       const entry = new vscode.CompletionItem(
         '\\' + item.name, vscode.CompletionItemKind.Constant);
       entry.detail = item.symbol;
@@ -652,7 +652,7 @@ function formatAsMath() {
     const whole = editor.document.lineAt(range.start.line).text.trim();
     const display = latex && range.start.line === range.end.line && source === whole;
 
-    const out = maple.formatAsMath(source, latex ? 'latex' : 'unicode', { display: display });
+    const out = notation.formatAsMath(source, latex ? 'latex' : 'unicode', { display: display });
     if (out !== null) edits.push({ range: range, text: out });
   });
 
