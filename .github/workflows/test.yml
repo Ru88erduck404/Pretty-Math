@@ -37,5 +37,11 @@ jobs:
       - name: Library support
         run: node test/libraries.js
 
+      - name: Math input
+        run: node test/mathinput.js
+
+      - name: Checks
+        run: node test/checks.js
+
       - name: Hostile input
         run: node test/hostile.js

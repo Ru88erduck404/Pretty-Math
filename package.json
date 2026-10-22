@@ -2,7 +2,7 @@
   "name": "pretty-math",
   "displayName": "Pretty Math",
   "description": "Renders the math expression under your cursor as real two-dimensional math in a panel, so precedence and grouping mistakes are obvious.",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "publisher": "ru88erduck404",
   "author": { "name": "Malthe Møller Kristensen", "url": "https://github.com/Ru88erduck404" },
   "license": "MIT",
@@ -12,7 +12,7 @@
   "icon": "media/marketplace-icon.png",
   "galleryBanner": { "color": "#161b26", "theme": "dark" },
   "main": "./extension.js",
-  "activationEvents": ["onView:prettyMath.view"],
+  "activationEvents": ["onView:prettyMath.view", "onStartupFinished"],
   "extensionKind": ["ui", "workspace"],
   "contributes": {
     "viewsContainers": {
@@ -30,11 +30,15 @@
       { "command": "prettyMath.pin", "title": "Pin / Unpin Current Expression", "category": "Pretty Math" },
       { "command": "prettyMath.copyLatex", "title": "Copy Current Expression as LaTeX", "category": "Pretty Math" },
       { "command": "prettyMath.toggleValues", "title": "Toggle Variable Values", "category": "Pretty Math" },
-      { "command": "prettyMath.toggleChecks", "title": "Toggle Checks", "category": "Pretty Math" }
+      { "command": "prettyMath.toggleChecks", "title": "Toggle Checks", "category": "Pretty Math" },
+      { "command": "prettyMath.formatAsMath", "title": "Format Selection as Math", "category": "Pretty Math" },
+      { "command": "prettyMath.toggleMathInput", "title": "Toggle Math Input", "category": "Pretty Math" }
     ],
     "keybindings": [
       { "command": "prettyMath.show", "key": "alt+p", "mac": "alt+p" },
-      { "command": "prettyMath.show", "key": "ctrl+alt+m", "mac": "cmd+alt+m" }
+      { "command": "prettyMath.show", "key": "ctrl+alt+m", "mac": "cmd+alt+m" },
+      { "command": "prettyMath.formatAsMath", "key": "alt+m", "mac": "alt+m", "when": "editorTextFocus" },
+      { "command": "prettyMath.toggleMathInput", "key": "alt+shift+m", "mac": "alt+shift+m" }
     ],
     "menus": {
       "editor/context": [
@@ -105,6 +109,17 @@
           "default": false,
           "markdownDescription": "In a notebook, ask the running kernel what the variables hold, the way the Variables view does. **Off by default**: the Jupyter extension will ask you to grant this extension permission to execute code against kernels, which is a broad permission for a narrow use, so it is opt-in. What gets sent is a single statement that prints the names currently holding a finite number and defines nothing. Only applies while **Values** is on, and only where a kernel is already idle. Without it, values still come from the cells above."
         },
+        "prettyMath.mathInput": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Turn names into symbols as you type them: `\\alpha` becomes α, `\\int` becomes ∫, `\\le` becomes ≤. The name is replaced once you type something that cannot be part of it, so both `\\le` and `\\leq` can be reached, and a space used only to end a name is swallowed. Nothing without a leading backslash is ever touched. Toggled with **Alt+Shift+M**."
+        },
+        "prettyMath.mathInputTarget": {
+          "type": "string",
+          "enum": ["auto", "latex", "unicode"],
+          "default": "auto",
+          "markdownDescription": "What **Format Selection as Math** (Alt+M) writes. `auto` writes LaTeX between dollar signs in a notebook's markdown cell, a `.md` file or a LaTeX document, where it will be rendered as real two-dimensional maths, and Unicode such as `x² + √y` everywhere else, where a backslash would only ever be read as a backslash."
+        },
         "prettyMath.showChecks": {
           "type": "boolean",
           "default": true,
@@ -146,7 +161,7 @@
     }
   },
   "scripts": {
-    "test": "node test/run.js && node test/host.js && node test/corpus.js && node test/libraries.js && node test/checks.js && node test/hostile.js && node test/fuzz.js",
+    "test": "node test/run.js && node test/host.js && node test/corpus.js && node test/libraries.js && node test/checks.js && node test/mathinput.js && node test/hostile.js && node test/fuzz.js",
     "package": "npx --yes @vscode/vsce package"
   },
   "repository": { "type": "git", "url": "https://github.com/Ru88erduck404/Pretty-Math.git" },

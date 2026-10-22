@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const { analyze } = require('./src/pretty');
 const { collectValues, valuesFromDebugger, mathAliases, importModules } = require('./src/values');
 const { collectUnits } = require('./src/units');
+const maple = require('./src/maple');
 const { formatNumber } = require('./src/evaluate');
 const { readKernelValues } = require('./src/jupyter');
 
@@ -532,6 +533,139 @@ class PrettyMathView {
   }
 }
 
+// --------------------------------------------------------------- math input
+
+// Where a formula will be rendered as maths rather than read as text: a
+// notebook's markdown cell is an ordinary markdown document to VS Code, so one
+// test covers both it and a .md file.
+function wantsLatex(document) {
+  if (!document) return false;
+  const id = document.languageId;
+  return id === 'markdown' || id === 'quarto' || id === 'rmd' || id === 'latex';
+}
+
+// `\alpha` becomes α once what follows cannot be part of the name. Waiting for
+// that keystroke is what makes `\le` and `\leq` both typable: expanding the
+// moment a name is complete would make the longer one unreachable.
+//
+// There is no guard against this reacting to its own edit, because it cannot:
+// the edit replaces a run of characters, and only a pure insertion of one
+// character gets this far. A flag would have been a flag held across an
+// asynchronous edit, which is to say a keystroke dropped by whoever typed the
+// next one quickly enough.
+function expandOnType(event) {
+  const cfg = vscode.workspace.getConfiguration('prettyMath');
+  if (!cfg.get('mathInput', false)) return;
+
+  const editor = vscode.window.activeTextEditor;
+  if (!editor || editor.document !== event.document) return;
+  if (event.contentChanges.length !== 1) return;
+
+  const change = event.contentChanges[0];
+  // One character, typed rather than pasted or deleted.
+  if (change.text.length !== 1 || change.rangeLength !== 0) return;
+  const typed = change.text;
+  if (/[A-Za-z]/.test(typed)) return;
+
+  const at = change.range.start;
+  const line = event.document.lineAt(at.line).text;
+  const found = maple.expandAt(line, at.character);
+  if (!found) return;
+
+  // A space was only ever a delimiter, so it goes with the name it ended.
+  // Anything else was meant, and stays.
+  const end = typed === ' ' ? at.character + 1 : at.character;
+  const range = new vscode.Range(
+    new vscode.Position(at.line, found.start),
+    new vscode.Position(at.line, end));
+
+  // Joined to the surrounding typing for undo, so that one press of ctrl+z
+  // takes back the symbol along with the keystroke that asked for it.
+  editor.edit(function (builder) { builder.replace(range, found.text); },
+    { undoStopBefore: false, undoStopAfter: false });
+}
+
+// The same names, offered as you type them, so that the table does not have to
+// be memorised to be useful.
+const mathInputCompletions = {
+  provideCompletionItems: function (document, position) {
+    const cfg = vscode.workspace.getConfiguration('prettyMath');
+    if (!cfg.get('mathInput', false)) return undefined;
+
+    const line = document.lineAt(position.line).text.slice(0, position.character);
+    const started = /\\([A-Za-z]*)$/.exec(line);
+    if (!started) return undefined;
+
+    const replace = new vscode.Range(
+      new vscode.Position(position.line, position.character - started[0].length),
+      position);
+
+    return maple.completionsFor(started[1]).slice(0, 200).map(function (item, i) {
+      const entry = new vscode.CompletionItem(
+        '\\' + item.name, vscode.CompletionItemKind.Constant);
+      entry.detail = item.symbol;
+      entry.insertText = item.symbol;
+      entry.filterText = '\\' + item.name;
+      entry.range = replace;
+      entry.sortText = String(1000 + i);
+      entry.documentation = 'Insert ' + item.symbol;
+      return entry;
+    });
+  }
+};
+
+// Formats the selection, or the line the cursor is on when nothing is
+// selected. The text is left exactly as it was when it does not parse: a
+// formatter that mangles what it cannot read is one you stop trusting.
+function formatAsMath() {
+  const editor = vscode.window.activeTextEditor;
+  if (!editor) return;
+
+  const cfg = vscode.workspace.getConfiguration('prettyMath');
+  const choice = cfg.get('mathInputTarget', 'auto');
+  const latex = choice === 'latex' || (choice === 'auto' && wantsLatex(editor.document));
+
+  const edits = [];
+  const selections = editor.selections && editor.selections.length
+    ? editor.selections : [editor.selection];
+
+  selections.forEach(function (selection) {
+    let range = selection;
+    // With nothing selected the line the cursor is on is what was meant, from
+    // its first real character to its last.
+    const empty = selection.isEmpty !== undefined
+      ? selection.isEmpty
+      : (selection.start.line === selection.end.line &&
+         selection.start.character === selection.end.character);
+    if (empty) {
+      const line = editor.document.lineAt(selection.start.line);
+      const from = line.text.length - line.text.replace(/^\s+/, '').length;
+      range = new vscode.Range(
+        new vscode.Position(selection.start.line, from),
+        new vscode.Position(selection.start.line, line.text.length));
+    }
+    const source = editor.document.getText(range).trim();
+    if (!source) return;
+
+    // A formula alone on its line is a displayed one; a formula inside a
+    // sentence is not. Guessing this right is worth more than a setting.
+    const whole = editor.document.lineAt(range.start.line).text.trim();
+    const display = latex && range.start.line === range.end.line && source === whole;
+
+    const out = maple.formatAsMath(source, latex ? 'latex' : 'unicode', { display: display });
+    if (out !== null) edits.push({ range: range, text: out });
+  });
+
+  if (!edits.length) {
+    vscode.window.setStatusBarMessage('Pretty Math: nothing here reads as a formula', 3000);
+    return;
+  }
+
+  editor.edit(function (builder) {
+    edits.forEach(function (e) { builder.replace(e.range, e.text); });
+  });
+}
+
 function activate(context) {
   const provider = new PrettyMathView(context);
 
@@ -542,8 +676,23 @@ function activate(context) {
     vscode.window.onDidChangeTextEditorSelection(function () { provider.schedule(); }),
     vscode.window.onDidChangeActiveTextEditor(function () { provider.schedule(); }),
     vscode.workspace.onDidChangeTextDocument(function (e) {
+      expandOnType(e);
       const editor = vscode.window.activeTextEditor;
       if (editor && e.document === editor.document) provider.schedule();
+    }),
+    vscode.languages.registerCompletionItemProvider(
+      { scheme: '*', language: '*' }, mathInputCompletions, '\\'),
+    vscode.commands.registerCommand('prettyMath.formatAsMath', formatAsMath),
+    vscode.commands.registerCommand('prettyMath.toggleMathInput', function () {
+      const c = vscode.workspace.getConfiguration('prettyMath');
+      const next = !c.get('mathInput', false);
+      return Promise.resolve(
+        c.update('mathInput', next, vscode.ConfigurationTarget.Global)
+      ).then(function () {
+        vscode.window.setStatusBarMessage(
+          next ? 'Pretty Math: math input on — type \\alpha for α'
+               : 'Pretty Math: math input off', 3000);
+      });
     }),
     vscode.workspace.onDidChangeConfiguration(function (e) {
       if (e.affectsConfiguration('prettyMath')) provider.update(true);

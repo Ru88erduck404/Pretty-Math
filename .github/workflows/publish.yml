@@ -54,6 +54,7 @@ jobs:
           node test/corpus.js
           node test/libraries.js
           node test/checks.js
+          node test/mathinput.js
           node test/hostile.js
           node test/fuzz.js
 

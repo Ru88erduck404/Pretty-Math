@@ -46,7 +46,13 @@ function makeDocument(text, languageId, scheme) {
       scheme: scheme || 'file',
       toString: function () { return (scheme || 'file') + ':///tmp/sample/' + lines.length + '/' + text.length; }
     },
-    lineAt: function (n) { return { text: lines[n] }; },
+    lineAt: function (n) { return { text: lines[n], lineNumber: n }; },
+    applyEdit: function (range, text) {
+      const l = range.start.line;
+      lines[l] = lines[l].slice(0, range.start.character) + text +
+        lines[l].slice(range.end.character);
+      this.lineCount = lines.length;
+    },
     offsetAt: function (p) { return starts[p.line] + p.character; },
     positionAt: function (o) {
       for (let i = lines.length - 1; i >= 0; i--) {
@@ -67,16 +73,32 @@ function eventStub(name) {
 }
 
 const decorations = [];
+const completionProviders = [];
+const commandHandlers = {};
 const posted = [];
 let clipboard = '';
 const extensionStubs = {};
 
+const edits = [];
 const editor = {
   document: null,
   selection: null,
   viewColumn: 1,
   setDecorations: function (type, ranges) { decorations.push({ type: type, ranges: ranges }); },
-  revealRange: function () {}
+  revealRange: function () {},
+  // Collects what an edit would do, and applies it to the stub document so
+  // that the next assertion sees the text the user would see.
+  edit: function (fn) {
+    const made = [];
+    fn({
+      replace: function (range, text) { made.push({ range: range, text: text }); }
+    });
+    made.forEach(function (m) { edits.push(m); });
+    if (made.length && editor.document && editor.document.applyEdit) {
+      made.slice().reverse().forEach(function (m) { editor.document.applyEdit(m.range, m.text); });
+    }
+    return Promise.resolve(true);
+  }
 };
 
 const vscodeStub = {
@@ -86,10 +108,21 @@ const vscodeStub = {
   Uri: { joinPath: function () { return { path: Array.prototype.slice.call(arguments, 1).join('/') }; } },
   ThemeColor: function (id) { this.id = id; },
   ConfigurationTarget: { Global: 1 },
+  CompletionItemKind: { Constant: 20 },
+  CompletionItem: function (label, kind) { this.label = label; this.kind = kind; },
+  languages: {
+    registerCompletionItemProvider: function (selector, provider) {
+      completionProviders.push(provider);
+      return { dispose: function () {} };
+    }
+  },
   TextEditorRevealType: { InCenterIfOutsideViewport: 2 },
   env: { clipboard: { writeText: function (t) { clipboard = t; return Promise.resolve(); } } },
   commands: {
-    registerCommand: function () { return { dispose: function () {} }; },
+    registerCommand: function (name, fn) {
+      commandHandlers[name] = fn;
+      return { dispose: function () {} };
+    },
     executeCommand: function () { return Promise.resolve(); }
   },
   workspace: {
@@ -227,6 +260,94 @@ check('reveal moves the selection',
 // Copy LaTeX.
 view.webview._onMessage({ type: 'copyLatex' });
 check('latex copied', clipboard, '\\mathrm{speed} = \\frac{\\mathrm{distance}}{t_{\\mathrm{end}} - t_{\\mathrm{start}}}');
+
+// ---- math input ------------------------------------------------------------
+
+// Typing, as the extension host sees it: a change event for the one character
+// that was pressed, and whatever the extension does about it.
+function type(doc, line, column, character) {
+  editor.document = doc;
+  editor.selection = new Selection(new Position(line, column), new Position(line, column));
+  listeners.change({
+    document: doc,
+    contentChanges: [{
+      text: character,
+      rangeLength: 0,
+      range: new Range(new Position(line, column), new Position(line, column))
+    }]
+  });
+}
+
+DEFAULTS.mathInput = true;
+let mathDoc = makeDocument('E = m\\cdot', 'python');
+type(mathDoc, 0, 10, ' ');
+check('a name becomes a symbol when a space ends it',
+  mathDoc.lineAt(0).text, 'E = m·');
+
+// The space was only a delimiter and goes with the name; any other character
+// was meant and stays.
+mathDoc = makeDocument('a\\alpha+b', 'python');
+type(mathDoc, 0, 7, '+');
+check('another character ends the name and remains',
+  mathDoc.lineAt(0).text, 'aα+b');
+
+// A letter cannot end a name, or \\leq could never be typed.
+mathDoc = makeDocument('\\le', 'python');
+type(mathDoc, 0, 3, 'q');
+check('a letter does not end a name', mathDoc.lineAt(0).text, '\\le');
+
+// Switched off, nothing is touched at all.
+DEFAULTS.mathInput = false;
+mathDoc = makeDocument('x\\alpha', 'python');
+type(mathDoc, 0, 7, ' ');
+check('nothing is rewritten while math input is off',
+  mathDoc.lineAt(0).text, 'x\\alpha');
+DEFAULTS.mathInput = true;
+
+// Completions are offered for what has been typed so far, and only after a
+// backslash.
+check('a completion provider is registered', completionProviders.length > 0, true);
+const completions = completionProviders[0].provideCompletionItems(
+  makeDocument('x = \\alp', 'python'), new Position(0, 8));
+check('completions are offered for a half-typed name', completions.length > 0, true);
+check('the first one is the letter itself', completions[0].insertText, 'α');
+check('and it replaces the backslash too', completions[0].range.start.character, 4);
+check('nothing is offered without a backslash',
+  completionProviders[0].provideCompletionItems(
+    makeDocument('x = alp', 'python'), new Position(0, 7)), undefined);
+
+// Alt+M on a line of Python writes Unicode, because a backslash in a .py file
+// is read as a backslash.
+const formatCmd = commandHandlers['prettyMath.formatAsMath'];
+check('the format command is registered', typeof formatCmd, 'function');
+
+let fmtDoc = makeDocument('E = m*c^2', 'python');
+editor.document = fmtDoc;
+editor.selection = new Selection(new Position(0, 0), new Position(0, 0));
+editor.selections = [editor.selection];
+formatCmd();
+check('a code line becomes unicode', fmtDoc.lineAt(0).text, 'E = m·c²');
+
+// The same line in a notebook's markdown cell becomes LaTeX, which is what
+// that cell will actually render.
+fmtDoc = makeDocument('int(x^2, x = 0 .. 1)', 'markdown');
+editor.document = fmtDoc;
+editor.selection = new Selection(new Position(0, 0), new Position(0, 0));
+editor.selections = [editor.selection];
+formatCmd();
+check('a markdown cell becomes latex', fmtDoc.lineAt(0).text,
+  '$$\n\\int_{0}^{1} x^{2}\\,\\mathrm{d}x\n$$');
+
+// Prose is left exactly as it was.
+fmtDoc = makeDocument('the quick brown fox', 'markdown');
+editor.document = fmtDoc;
+editor.selection = new Selection(new Position(0, 0), new Position(0, 0));
+editor.selections = [editor.selection];
+formatCmd();
+check('prose is left alone', fmtDoc.lineAt(0).text, 'the quick brown fox');
+
+delete DEFAULTS.mathInput;
+editor.selections = undefined;
 
 // ---- checks ----------------------------------------------------------------
 

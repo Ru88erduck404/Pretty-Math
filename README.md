@@ -200,6 +200,70 @@ written in the source — those stay blue. Hovering one shows the name it replac
 are showing. Values are for checking magnitudes on the spot; the algebra is what
 you want in a document.
 
+## Typing maths
+
+Two things, both off until you ask for them.
+
+### Names become symbols as you type
+
+**Alt+Shift+M** turns math input on. After that, a backslash name becomes the
+symbol it stands for:
+
+```
+\alpha   → α        \int    → ∫        \le   → ≤
+\omega   → ω        \sum    → ∑        \ne   → ≠
+\partial → ∂        \sqrt   → √        \to   → →
+\infty   → ∞        \nabla  → ∇        \in   → ∈
+\R       → ℝ        \pm     → ±        \cdot → ·
+```
+
+The name is replaced once you type something that cannot be part of it, which
+is what keeps both `\le` and `\leq` reachable — expanding the moment a name
+was complete would swallow the shorter one. A space used only to end a name is
+swallowed with it; any other character was meant, and stays. A half-typed name
+is left alone, and so is anything without a leading backslash, which is what
+makes this safe to leave switched on: no word in prose or in code begins with
+a backslash.
+
+Completions appear as you type too, so the list does not have to be memorised.
+
+Greek letters are valid identifiers in Python, so `σ = 0.5` is real code — but
+a symbol typed into a `.py` file is a change to that file, so this stays off
+by default.
+
+### A line becomes typeset maths
+
+**Alt+M** formats the selection, or the line the cursor is on. It reads Maple's
+input syntax, and writes whichever form the file can actually show:
+
+| you type | in a `.py` file | in a markdown cell |
+| --- | --- | --- |
+| `x^2 + y^2` | `x² + y²` | `$x^{2} + y^{2}$` |
+| `sqrt(alpha^2 + beta^2)` | `√(α² + β²)` | `$\sqrt{\alpha^{2} + \beta^{2}}$` |
+| `int(x^2, x = 0 .. 1)` | `∫₀¹ x² dx` | `$\int_{0}^{1} x^{2}\,\mathrm{d}x$` |
+| `sum(1/i^2, i = 1 .. n)` | `∑ᵢ₌₁ⁿ 1/i²` | `$\sum_{i=1}^{n} \frac{1}{i^{2}}$` |
+| `diff(y, x, 2)` | `d²y/dx²` | `$\frac{\mathrm{d}^{2}y}{\mathrm{d}x^{2}}$` |
+| `limit(sin(x)/x, x = 0)` | `lim(x→0) sin(x)/x` | `$\lim_{x \to 0} \frac{\sin(x)}{x}$` |
+| `v_0*t + g*t^2/2` | `v₀·t + g·t²/2` | `$v_{0} \cdot t + \frac{g t^{2}}{2}$` |
+
+**In a notebook's markdown cell it writes LaTeX between dollar signs**, which
+is what that cell renders as real two-dimensional maths. A formula alone on its
+line is fenced with `$$` and displayed; one inside a sentence gets single
+dollars and stays inline. Everywhere else — a `.py` file, a comment, a plain
+text file — it writes Unicode, because a backslash in those is only ever read
+as a backslash.
+
+The Maple forms it understands are `int(f, x = a .. b)`, `int(f, x)`,
+`sum`/`product` over a range, `diff(y, x, n)`, `limit(f, x = a)`, `sqrt`,
+`abs`, `exp`, `Pi` and `infinity`. Everything else is ordinary expression
+syntax and needs no translation.
+
+A raised form is all or nothing: Unicode has no superscript `q` and no
+subscript `b`, so `x^q` stays as `x^(q)` rather than becoming half-raised,
+which reads as a typo. And **text that is not a formula is never touched** —
+prose, a bullet, a table row and a half-written expression all come back
+exactly as they were, with a note in the status bar.
+
 ## Checking the formula
 
 The drawing shows you how an expression is put together. The **Checks** button
@@ -347,6 +411,8 @@ Clicking a remark selects the part of the line it is about.
 | `prettyMath.stripNamespaces` | `Math, math, np, sp, sympy, self, …` | qualifiers to drop |
 | `prettyMath.substituteValues` | `false` | the Values button; draw what variables are worth |
 | `prettyMath.valueDigits` | `6` | significant digits for a substituted value |
+| `prettyMath.mathInput` | `false` | Alt+Shift+M; backslash names become symbols as you type |
+| `prettyMath.mathInputTarget` | `auto` | what Alt+M writes: LaTeX in markdown, Unicode elsewhere |
 | `prettyMath.showChecks` | `true` | the Checks button; report what is wrong as well as drawing it |
 | `prettyMath.checkUnits` | `true` | dimensional analysis, from scipy.constants and unit comments |
 | `prettyMath.lintFormulas` | `true` | the short list of certain mistakes |
