@@ -180,6 +180,13 @@ check('and int(x) is the ordinary builtin',
   uni('print(int(x))'), 'print(int(x))');
 check('a bracket inside a string does not unbalance the scan',
   notation.toParserSyntax('f("a)b", x)'), 'f("a)b", x)');
+// Quoted text is somebody's words, not notation to be translated.
+check('a name is not rewritten inside a string',
+  notation.toParserSyntax('msg = "infinity and beyond"'), 'msg = "infinity and beyond"');
+check('nor is Pi', notation.toParserSyntax('f("Pi")'), 'f("Pi")');
+check('but it is outside one', notation.toParserSyntax('x = Pi'), 'x = pi');
+check('and both at once',
+  notation.toParserSyntax('x = Pi + f("Pi")'), 'x = pi + f("Pi")');
 
 // A layout only applies when the arguments it needs are there. `limit(f,
 // x = 0)` beside another call reaches the renderer with its range as a keyword

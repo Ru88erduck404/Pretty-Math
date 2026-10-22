@@ -160,8 +160,36 @@ function toParserSyntax(text) {
     i = close + 1;
   }
 
-  // These are spelled with a capital, and in full, in that dialect.
-  return out.replace(/\bPi\b/g, 'pi').replace(/\binfinity\b/g, 'oo');
+  // These are spelled with a capital, and in full, in that dialect -- but only
+  // where they are names. Quoted text is somebody's words, and "infinity and
+  // beyond" has no business becoming "oo and beyond".
+  return outsideStrings(out, function (part) {
+    return part.replace(/\bPi\b/g, 'pi').replace(/\binfinity\b/g, 'oo');
+  });
+}
+
+// Applies `fn` to the parts of `text` that are not inside quotes.
+function outsideStrings(text, fn) {
+  let out = '';
+  let plain = '';
+  let quote = null;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      out += c;
+      if (c === '\\') { out += text[i + 1] || ''; i++; }
+      else if (c === quote) quote = null;
+      continue;
+    }
+    if (c === '"' || c === "'") {
+      out += fn(plain) + c;
+      plain = '';
+      quote = c;
+      continue;
+    }
+    plain += c;
+  }
+  return out + fn(plain);
 }
 
 // One call, with its arguments already rewritten.

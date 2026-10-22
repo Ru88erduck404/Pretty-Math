@@ -312,6 +312,19 @@ const completions = completionProviders[0].provideCompletionItems(
 check('completions are offered for a half-typed name', completions.length > 0, true);
 check('the first one is the letter itself', completions[0].insertText, 'α');
 check('and it replaces the backslash too', completions[0].range.start.character, 4);
+// The list accepts on the characters that end a name anyway, so that typing
+// `\alpha ` works whether or not the list happens to be showing. Without this
+// it accepted on Enter and Tab alone, and a space went to the list rather than
+// to the expansion.
+check('a space accepts the suggestion',
+  (completions[0].commitCharacters || []).indexOf(' ') >= 0, true);
+check('and so do the operators that end a name',
+  ['+', '*', '/', '(', ','].every(function (c) {
+    return (completions[0].commitCharacters || []).indexOf(c) >= 0;
+  }), true);
+check('but a letter does not, or \\leq could not be typed',
+  (completions[0].commitCharacters || []).some(function (c) { return /[A-Za-z]/.test(c); }),
+  false);
 check('nothing is offered without a backslash',
   completionProviders[0].provideCompletionItems(
     makeDocument('x = alp', 'python'), new Position(0, 7)), undefined);

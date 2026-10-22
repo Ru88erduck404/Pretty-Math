@@ -607,6 +607,13 @@ const mathInputCompletions = {
       entry.insertText = item.symbol;
       entry.filterText = '\\' + item.name;
       entry.range = replace;
+      // Without these the list accepts on Enter and Tab alone, so typing
+      // `\alpha ` left the name sitting there whenever the list happened to be
+      // open -- the keystroke that should have ended it went to the list
+      // instead. These are the same characters that end a name when no list is
+      // showing, so both routes now agree.
+      entry.commitCharacters = [' ', '+', '-', '*', '/', '^', '=', '(', ')',
+        '[', ']', ',', ';', ':', '.', '<', '>'];
       entry.sortText = String(1000 + i);
       entry.documentation = 'Insert ' + item.symbol;
       return entry;

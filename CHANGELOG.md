@@ -4,6 +4,20 @@ All notable changes to Pretty Math are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.3.3] — 2026-10-22
+
+### Fixed
+
+- A name now becomes its symbol on a space, an operator or a bracket, not only
+  on Enter or Tab. The suggestion list was accepting on those two alone, so
+  whenever it happened to be showing it took the keystroke that should have
+  ended the name, and `\alpha ` left the name sitting there. The list now
+  accepts on the same characters that end a name when no list is open, so both
+  routes agree.
+- `Pi` and `infinity` are no longer rewritten inside quoted text, so
+  `msg = "infinity and beyond"` stays what it says. The bracket matching
+  already skipped strings; these two replacements did not.
+
 ## [0.3.2] — 2026-10-22
 
 ### Changed
